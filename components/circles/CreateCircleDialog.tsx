@@ -32,7 +32,7 @@ export function CreateCircleDialog({ open, onClose }: Props) {
     setSubmitting(true);
     try {
       const id = await createCircle(
-        { name: name.trim(), description: description.trim() },
+        { name: name.trim(), description: description.trim(), emoji: '🎯' },
         {
           uid: user.uid,
           displayName: user.displayName ?? '名前未設定',
