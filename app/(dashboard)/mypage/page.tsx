@@ -404,7 +404,7 @@ export default function MyPage() {
                     {heatmapDates.map((date) => (
                         <div
                             key={date}
-                            className={`h-3 w-3 rounded-sm ${heatmapData[date] ? 'bg-black' : 'bg-neutral-100'
+                            className={`h-3 w-3 rounded-sm ${heatmapData[date as string] ? 'bg-black' : 'bg-neutral-100'
                                 }`}
                             title={date}
                         />
