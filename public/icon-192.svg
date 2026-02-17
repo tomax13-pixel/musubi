@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" fill="#ffffff"/>
+  <text 
+    x="96" 
+    y="96" 
+    font-family="'Noto Sans JP', 'Hiragino Sans', sans-serif" 
+    font-size="100" 
+    font-weight="600" 
+    text-anchor="middle" 
+    dominant-baseline="central" 
+    fill="#000000"
+  >結</text>
+</svg>

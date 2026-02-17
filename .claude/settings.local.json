@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "Bash(robocopy:*)",
+      "Bash(echo:*)",
+      "Bash(powershell -Command \"Copy-Item -Path ''C:\\\\Users\\\\Tomax\\\\OneDrive\\\\musubi-temp\\\\*'' -Destination ''C:\\\\Users\\\\Tomax\\\\OneDrive\\\\musubi\\\\'' -Recurse -Force -Exclude ''.git''\")",
+      "Bash(powershell -Command \"Remove-Item -Path ''C:\\\\Users\\\\Tomax\\\\OneDrive\\\\musubi-temp'' -Recurse -Force\")",
+      "Bash(npm install:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(\"C:/Users/Tomax/OneDrive/musubi/components.json\" << 'EOF'\n{\n  \"$schema\": \"https://ui.shadcn.com/schema.json\",\n  \"style\": \"default\",\n  \"rsc\": true,\n  \"tsx\": true,\n  \"tailwind\": {\n    \"config\": \"\",\n    \"css\": \"app/globals.css\",\n    \"baseColor\": \"neutral\",\n    \"cssVariables\": true,\n    \"prefix\": \"\"\n  },\n  \"aliases\": {\n    \"components\": \"@/components\",\n    \"utils\": \"@/lib/utils/cn\",\n    \"ui\": \"@/components/ui\",\n    \"lib\": \"@/lib\",\n    \"hooks\": \"@/lib/hooks\"\n  },\n  \"iconLibrary\": \"lucide\"\n}\nEOF)"
+    ]
+  }
+}
