@@ -142,7 +142,7 @@ export async function getHeatmapData(uid: string): Promise<Record<string, boolea
         if (record.checkedInAt) {
             const date = record.checkedInAt.toDate();
             const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-            heatmap[dateKey] = true;
+            heatmap[dateKey as string] = true;
         }
     });
 
