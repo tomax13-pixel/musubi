@@ -16,9 +16,10 @@ import type { UserProfile, AttendanceRecord, PaymentRecord } from '@/lib/types/m
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Edit, TrendingUp, Calendar, DollarSign, Award, Flame, BadgeCheck } from 'lucide-react';
+import { Edit, TrendingUp, Calendar, DollarSign, Award, Flame, BadgeCheck, Bell, BellRing } from 'lucide-react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 // カウントアップ用のカスタムフック
 function useCountUp(target: number, duration: number = 800) {
@@ -45,6 +46,7 @@ function useCountUp(target: number, duration: number = 800) {
 
 export default function MyPage() {
     const { user } = useAuthContext();
+    const { permissionState, requestPermission } = useNotifications(user?.uid);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
     const [paymentHistory, setPaymentHistory] = useState<PaymentRecord[]>([]);
@@ -428,6 +430,41 @@ export default function MyPage() {
                         ステータス: すべて完了
                     </div>
                 )}
+            </div>
+
+            {/* 通知設定 */}
+            <div className="rounded-lg border border-neutral-200 bg-white p-6">
+                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
+                    <Bell className="h-3.5 w-3.5" />
+                    通知設定
+                </div>
+                <div className="mt-4">
+                    {permissionState === 'granted' && (
+                        <div className="flex items-center gap-2 text-sm text-neutral-700">
+                            <BellRing className="h-4 w-4" />
+                            <span>通知は有効です</span>
+                        </div>
+                    )}
+                    {permissionState === 'denied' && (
+                        <p className="text-sm text-neutral-500">
+                            ブラウザの設定から通知を許可してください。
+                        </p>
+                    )}
+                    {permissionState === 'default' && (
+                        <button
+                            onClick={requestPermission}
+                            className="inline-flex items-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-neutral-50"
+                        >
+                            <Bell className="h-4 w-4" />
+                            プッシュ通知を有効にする
+                        </button>
+                    )}
+                    {permissionState === 'unsupported' && (
+                        <p className="text-sm text-neutral-500">
+                            このブラウザはプッシュ通知に対応していません。
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );

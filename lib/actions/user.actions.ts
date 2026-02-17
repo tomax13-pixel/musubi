@@ -9,6 +9,7 @@ import {
     where,
     getDocs,
     collectionGroup,
+    arrayUnion,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/clientApp';
 import type { UserProfile, AttendanceRecord, PaymentRecord } from '@/lib/types/models';
@@ -30,6 +31,15 @@ export async function updateUserProfile(
     data: { faculty?: string; grade?: string }
 ): Promise<void> {
     await updateDoc(doc(db, 'users', uid), data);
+}
+
+/**
+ * FCMトークンをユーザーのFirestoreドキュメントに保存
+ */
+export async function saveFCMToken(uid: string, token: string): Promise<void> {
+    await updateDoc(doc(db, 'users', uid), {
+        fcmTokens: arrayUnion(token),
+    });
 }
 
 /**
