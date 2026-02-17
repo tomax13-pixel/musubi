@@ -34,7 +34,7 @@ export async function createCircle(
   await setDoc(memberRef, {
     uid: currentUser.uid,
     role: 'organizer',
-    joinedAt: serverTimestamp(),
+    joinedAt: serverTimestamp() as any,
     displayName: currentUser.displayName,
     email: currentUser.email,
     photoURL: currentUser.photoURL,
