@@ -122,3 +122,79 @@ export async function getAttendanceForEvent(
   );
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AttendanceRecord));
 }
+
+/**
+ * QRコードスキャンによる個別チェックイン
+ * 幹事がメンバーのQRコードを読み取り、出欠を記録する
+ */
+export async function qrCheckIn(
+  circleId: string,
+  eventId: string,
+  memberUid: string,
+  currentUserUid: string
+): Promise<{ success: boolean; displayName: string }> {
+  const role = await getCurrentUserRole(circleId, currentUserUid);
+  if (role !== 'organizer') throw new Error('オーガナイザーのみチェックインを実行できます');
+
+  // メンバーであることを確認
+  const memberSnap = await getDoc(doc(db, 'circles', circleId, 'members', memberUid));
+  if (!memberSnap.exists()) throw new Error('このサークルのメンバーではありません');
+  const memberData = memberSnap.data();
+
+  // イベント情報を取得（参加費）
+  const eventSnap = await getDoc(doc(db, 'circles', circleId, 'events', eventId));
+  if (!eventSnap.exists()) throw new Error('イベントが見つかりません');
+  const eventData = eventSnap.data();
+  const fee = eventData.fee as number;
+
+  // 既にチェックイン済みか確認
+  const existingSnap = await getDoc(
+    doc(db, 'circles', circleId, 'events', eventId, 'attendance', memberUid)
+  );
+  if (existingSnap.exists() && existingSnap.data().attended) {
+    return { success: false, displayName: memberData.displayName };
+  }
+
+  const batch = writeBatch(db);
+  const now = serverTimestamp();
+
+  // 出欠記録
+  const attendanceRef = doc(
+    db, 'circles', circleId, 'events', eventId, 'attendance', memberUid
+  );
+  batch.set(attendanceRef, {
+    eventId,
+    circleId,
+    isGuest: false,
+    uid: memberUid,
+    attended: true,
+    checkedInAt: now,
+    checkedInBy: currentUserUid,
+    displayName: memberData.displayName,
+    email: memberData.email || '',
+    photoURL: memberData.photoURL || null,
+  });
+
+  // 支払い記録を自動生成
+  const paymentRef = doc(
+    db, 'circles', circleId, 'events', eventId, 'payments', memberUid
+  );
+  batch.set(paymentRef, {
+    eventId,
+    circleId,
+    isGuest: false,
+    uid: memberUid,
+    amount: fee,
+    status: 'unpaid',
+    markedPaidAt: null,
+    confirmedAt: null,
+    createdAt: now,
+    updatedAt: now,
+    displayName: memberData.displayName,
+    email: memberData.email || '',
+  }, { merge: false });
+
+  await batch.commit();
+
+  return { success: true, displayName: memberData.displayName };
+}

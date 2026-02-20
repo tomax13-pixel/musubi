@@ -16,10 +16,11 @@ import type { UserProfile, AttendanceRecord, PaymentRecord } from '@/lib/types/m
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Edit, TrendingUp, Calendar, DollarSign, Award, Flame, BadgeCheck, Bell, BellRing } from 'lucide-react';
+import { Edit, TrendingUp, Calendar, DollarSign, Award, Flame, BadgeCheck, Bell, BellRing, QrCode } from 'lucide-react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { QRCodeSVG } from 'qrcode.react';
 
 // カウントアップ用のカスタムフック
 function useCountUp(target: number, duration: number = 800) {
@@ -464,6 +465,31 @@ export default function MyPage() {
                             このブラウザはプッシュ通知に対応していません。
                         </p>
                     )}
+                </div>
+            </div>
+
+            {/* デジタル会員証 */}
+            <div className="rounded-lg border border-neutral-200 bg-white p-6">
+                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-neutral-500">
+                    <QrCode className="h-3.5 w-3.5" />
+                    デジタル会員証
+                </div>
+                <div className="mt-4 flex flex-col items-center gap-4">
+                    <div className="rounded-lg border border-neutral-100 bg-white p-4">
+                        <QRCodeSVG
+                            value={JSON.stringify({ type: 'musubi_member', uid: user.uid })}
+                            size={160}
+                            level="M"
+                            bgColor="#ffffff"
+                            fgColor="#000000"
+                        />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-sm font-medium">{profile.displayName}</p>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                            イベント会場でこのQRコードを幹事に見せてチェックインしてください
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

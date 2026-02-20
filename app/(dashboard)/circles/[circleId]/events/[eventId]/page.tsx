@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin, QrCode } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getEvent } from '@/lib/actions/event.actions';
 import { getCurrentUserRole } from '@/lib/actions/circle.actions';
@@ -93,8 +93,17 @@ export default function EventDetailPage() {
       <div className="flex flex-wrap gap-2">
         {isOrganizer && (
           <Link
+            href={`/circles/${circleId}/events/${eventId}/checkin`}
+            className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-neutral-800"
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            QRチェックイン
+          </Link>
+        )}
+        {isOrganizer && (
+          <Link
             href={`/circles/${circleId}/events/${eventId}/attendance`}
-            className="rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-neutral-800"
+            className="rounded-md border border-neutral-200 px-4 py-2 text-[13px] font-medium transition-colors hover:bg-neutral-50"
           >
             ✏️ 出欠を記録
           </Link>
