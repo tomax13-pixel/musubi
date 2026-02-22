@@ -12,10 +12,14 @@ import {
     calculateStreak,
     getHeatmapData,
 } from '@/lib/actions/user.actions';
+import { updateUserProfileAdmin } from '@/lib/actions/profile.actions';
 import type { UserProfile, AttendanceRecord, PaymentRecord } from '@/lib/types/models';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { storage } from '@/lib/firebase/clientApp';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Edit, TrendingUp, Calendar, DollarSign, Award, Flame, BadgeCheck, Bell, BellRing, QrCode } from 'lucide-react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -55,8 +59,12 @@ export default function MyPage() {
     const [heatmapData, setHeatmapData] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [editDisplayName, setEditDisplayName] = useState('');
     const [editFaculty, setEditFaculty] = useState('');
     const [editGrade, setEditGrade] = useState('');
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
     const [showRankUp, setShowRankUp] = useState(false);
     const [newRank, setNewRank] = useState('');
     const [previousStreak, setPreviousStreak] = useState(0);
@@ -186,16 +194,42 @@ export default function MyPage() {
     };
 
     const handleSaveProfile = async () => {
-        if (!user) return;
+        if (!user || !profile) return;
+        setUploading(true);
         try {
+            let photoURL = profile.photoURL ?? null;
+
+            // 写真が選択されていたら Storage にアップロード
+            if (avatarFile) {
+                const storageRef = ref(storage, `profile_images/${user.uid}/avatar`);
+                await uploadBytes(storageRef, avatarFile);
+                photoURL = await getDownloadURL(storageRef);
+            }
+
+            // displayName と photoURL を Admin SDK で更新（全サークル同期）
+            await updateUserProfileAdmin(user.uid, {
+                displayName: editDisplayName.trim() || profile.displayName,
+                photoURL,
+            });
+
+            // 学部・学年は既存の updateUserProfile で更新
             await updateUserProfile(user.uid, {
                 faculty: editFaculty,
                 grade: editGrade,
             });
-            setProfile({ ...profile!, faculty: editFaculty, grade: editGrade });
+
+            setProfile({
+                ...profile,
+                displayName: editDisplayName.trim() || profile.displayName,
+                photoURL,
+                faculty: editFaculty,
+                grade: editGrade,
+            });
             setDialogOpen(false);
         } catch (error) {
             console.error('プロフィール更新エラー:', error);
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -256,19 +290,70 @@ export default function MyPage() {
 
             {/* プロフィール・ヘッダー */}
             <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-4xl font-bold tracking-tight">{profile.displayName}</h1>
-                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                            <button className="rounded-md p-2 transition-colors hover:bg-neutral-100">
-                                <Edit className="h-4 w-4" />
-                            </button>
-                        </DialogTrigger>
+                <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                        <AvatarImage src={profile.photoURL ?? undefined} />
+                        <AvatarFallback className="text-xl font-semibold">
+                            {profile.displayName.charAt(0)}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-4xl font-bold tracking-tight">{profile.displayName}</h1>
+                        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                            <DialogTrigger asChild>
+                                <button
+                                    className="rounded-md p-2 transition-colors hover:bg-neutral-100"
+                                    onClick={() => {
+                                        setEditDisplayName(profile.displayName);
+                                        setAvatarPreview(profile.photoURL ?? null);
+                                        setAvatarFile(null);
+                                        setEditFaculty(profile.faculty ?? '');
+                                        setEditGrade(profile.grade ?? '');
+                                    }}
+                                >
+                                    <Edit className="h-4 w-4" />
+                                </button>
+                            </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>プロフィール編集</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
+                                {/* アバター写真 */}
+                                <div className="flex items-center gap-4">
+                                    <Avatar className="h-16 w-16">
+                                        <AvatarImage src={avatarPreview ?? undefined} />
+                                        <AvatarFallback className="text-xl">
+                                            {editDisplayName.charAt(0) || profile.displayName.charAt(0)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <label className="cursor-pointer rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-neutral-50">
+                                        写真を変更
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                setAvatarFile(file);
+                                                setAvatarPreview(URL.createObjectURL(file));
+                                            }}
+                                        />
+                                    </label>
+                                </div>
+                                {/* 名前 */}
+                                <div>
+                                    <Label htmlFor="displayName">名前</Label>
+                                    <input
+                                        id="displayName"
+                                        className="mt-1.5 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                                        value={editDisplayName}
+                                        onChange={(e) => setEditDisplayName(e.target.value)}
+                                        placeholder="名前を入力"
+                                        maxLength={30}
+                                    />
+                                </div>
                                 <div>
                                     <Label htmlFor="faculty">学部</Label>
                                     <input
@@ -295,12 +380,13 @@ export default function MyPage() {
                                         <option value="既卒">既卒</option>
                                     </select>
                                 </div>
-                                <Button onClick={handleSaveProfile} className="w-full">
-                                    保存
+                                <Button onClick={handleSaveProfile} disabled={uploading} className="w-full">
+                                    {uploading ? '保存中...' : '保存'}
                                 </Button>
                             </div>
                         </DialogContent>
                     </Dialog>
+                    </div>
                 </div>
 
                 {profile.faculty && profile.grade && (
