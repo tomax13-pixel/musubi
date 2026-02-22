@@ -58,10 +58,22 @@ export default function CircleDetailPage() {
         {isOrganizer && (
           <div className="flex gap-2">
             <Link
+              href={`/circles/${circleId}/members`}
+              className="rounded-md border border-neutral-200 px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
+            >
+              👥 メンバー
+            </Link>
+            <Link
               href={`/circles/${circleId}/guests`}
               className="rounded-md border border-neutral-200 px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
             >
               👤 ゲスト管理
+            </Link>
+            <Link
+              href={`/circles/${circleId}/analytics`}
+              className="rounded-md border border-neutral-200 px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
+            >
+              📊 アナリティクス
             </Link>
           </div>
         )}
