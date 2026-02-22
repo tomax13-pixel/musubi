@@ -1,8 +1,9 @@
 'use server';
 
 import { adminDb } from '@/lib/firebase/adminApp';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
+import { serializeDoc } from '@/lib/utils/serialize';
 
 // Helper to check if user is organizer in a circle
 export async function getCurrentUserRoleAdmin(circleId: string, uid: string): Promise<'organizer' | 'member' | null> {
@@ -14,31 +15,6 @@ export async function getCurrentUserRoleAdmin(circleId: string, uid: string): Pr
 async function isOrganizer(circleId: string, uid: string): Promise<boolean> {
     const role = await getCurrentUserRoleAdmin(circleId, uid);
     return role === 'organizer';
-}
-
-/**
- * Firestore DocumentData をシリアライズ可能なプレーンオブジェクトに変換する
- * Timestamp型はISO文字列に変換される
- */
-export function serializeDoc<T = any>(data: any): T {
-    if (!data || typeof data !== 'object') return data;
-
-    const serializeValue = (val: any): any => {
-        if (!val) return val;
-        if (val instanceof Timestamp) return val.toDate().toISOString();
-        if (val instanceof Date) return val.toISOString();
-        if (Array.isArray(val)) return val.map(serializeValue);
-        if (typeof val === 'object') {
-            const res: any = {};
-            for (const key in val) {
-                res[key] = serializeValue(val[key]);
-            }
-            return res;
-        }
-        return val;
-    };
-
-    return serializeValue(data);
 }
 
 // Search user by email (Admin SDK - bypass rules)

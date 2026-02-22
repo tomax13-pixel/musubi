@@ -1,7 +1,9 @@
+'use server';
+
 import { adminDb } from '@/lib/firebase/adminApp';
 import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
-import { serializeDoc } from './admin.actions';
+import { serializeDoc } from '@/lib/utils/serialize';
 
 /**
  * ユーザープロフィールを更新し、所属する全サークルのメンバー情報も同期更新する

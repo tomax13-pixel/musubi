@@ -1,5 +1,8 @@
+'use server';
+
 import { adminDb } from '@/lib/firebase/adminApp';
-import { serializeDoc, getCurrentUserRoleAdmin } from './admin.actions';
+import { getCurrentUserRoleAdmin } from './admin.actions';
+import { serializeDoc } from '@/lib/utils/serialize';
 // Re-implementing helper to check if user is organizer in a circle
 // Re-implementing helper to check if user is organizer in a circle
 async function isOrganizerInternal(circleId: string, uid: string): Promise<boolean> {
