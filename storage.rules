@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// ユーザープロフィール画像用のストレージルール
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // プロフィール画像: public読み取り可能、本人による書き込みのみ許可
+    match /profile_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // その他のパスはデフォルトで拒否 (安全のため)
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

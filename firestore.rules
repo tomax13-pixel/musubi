@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ユーザー自身のドキュメント
+    // プロフィール検索(searchUserByEmail)のため、認証済みユーザー全員に読み取り権限を付与
+    // 書き込みは本人のみ
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // サークル関連
+    // クライアントサイドでの作成・更新ロジックがあるため、
+    // 現状は認証済みユーザーに対して広めの権限を設定しています。
+    // 将来的にはServer Actions(Admin SDK)への移行を推奨します。
+    match /circles/{circleId} {
+      allow read, write: if request.auth != null;
+
+      match /members/{memberId} {
+        allow read, write: if request.auth != null;
+      }
+
+      match /events/{eventId} {
+        allow read, write: if request.auth != null;
+
+        match /attendance/{attendanceId} {
+          allow read, write: if request.auth != null;
+        }
+
+        match /payments/{paymentId} {
+          allow read, write: if request.auth != null;
+        }
+
+        match /guests/{guestId} {
+          allow read, write: if request.auth != null;
+        }
+      }
+    }
+
+    // ★ collectionGroupクエリ用（ルートレベルのワイルドカード）
+    match /{path=**}/attendance/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    match /{path=**}/payments/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    match /{path=**}/members/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    // 通知ログ
+    match /notificationLogs/{logId} {
+      allow read: if request.auth != null;
+      // ログの作成は通常サーバー側で行うため、writeは制限することを推奨（現状は維持）
+      allow write: if request.auth != null;
+    }
+  }
+}
