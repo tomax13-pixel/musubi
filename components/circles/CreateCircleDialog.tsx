@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { createCircle } from '@/lib/actions/circle.actions';
+import { EmojiPicker } from './EmojiPicker';
 
 interface Props {
   open: boolean;
@@ -23,6 +24,7 @@ export function CreateCircleDialog({ open, onClose }: Props) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [emoji, setEmoji] = useState('🎯');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +34,7 @@ export function CreateCircleDialog({ open, onClose }: Props) {
     setSubmitting(true);
     try {
       const id = await createCircle(
-        { name: name.trim(), description: description.trim(), emoji: '🎯' },
+        { name: name.trim(), description: description.trim(), emoji },
         {
           uid: user.uid,
           displayName: user.displayName ?? '名前未設定',
@@ -58,6 +60,10 @@ export function CreateCircleDialog({ open, onClose }: Props) {
           <DialogTitle>サークルを作成</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>アイコン</Label>
+            <EmojiPicker value={emoji} onChange={setEmoji} />
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="circle-name">サークル名 *</Label>
             <Input
