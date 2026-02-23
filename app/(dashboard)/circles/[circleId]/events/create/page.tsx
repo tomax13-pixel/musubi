@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { createEvent } from '@/lib/actions/event.actions';
+import { createEventAdmin } from '@/lib/actions/admin.actions';
 
 export default function CreateEventPage() {
   const params = useParams();
@@ -28,12 +28,12 @@ export default function CreateEventPage() {
 
     setSubmitting(true);
     try {
-      const id = await createEvent(
+      const id = await createEventAdmin(
         circleId,
         {
           name: name.trim(),
           description: description.trim(),
-          date: new Date(date),
+          date: new Date(date).toISOString(),
           location: location.trim(),
           fee: parseInt(fee, 10),
         },

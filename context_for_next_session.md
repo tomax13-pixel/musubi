@@ -7,7 +7,26 @@
 
 ## 📅 セッション履歴サマリー
 
-### 2026/02/22（本日・最新）
+### 2026/02/23（本日・最新）
+
+以下をすべて `main` ブランチにコミット・push 済み。
+
+#### ⑦ プッシュ通知機能の実装
+- `lib/actions/notification.actions.ts`（新規）— 通知送信 Server Action
+  - `sendNotificationToAllMembers()` — 全メンバーへ一括送信
+  - `sendPaymentReminder()` — 未払いメンバーへ支払いリマインダー
+  - `sendAttendanceReminder()` — 未回答メンバーへ出欠リマインダー
+  - `notifyEventCreated()` — イベント作成時の自動通知（内部用）
+  - `getNotificationLogs()` — 通知ログ取得
+- `lib/actions/admin.actions.ts` — `createEventAdmin()` を追加（イベント作成後に自動通知）
+- `lib/types/models.ts` — `NotificationLog.type` に `event_created` / `attendance_reminder` を追加
+- `components/notifications/SendNotificationPanel.tsx`（新規）— 幹事向け手動送信UIパネル
+- `components/layout/Sidebar.tsx` — 🔔「通知をオンにする」ボタンを追加（未許可時のみ表示）
+- `app/(dashboard)/circles/[circleId]/events/create/page.tsx` — `createEventAdmin()` に差し替え
+- `app/(dashboard)/circles/[circleId]/events/[eventId]/page.tsx` — 幹事向け `SendNotificationPanel` を追加
+- `public/firebase-messaging-sw.js` — 直接初期化方式に変更、通知タイプ別リンク対応
+
+### 2026/02/22
 
 以下をすべて `main` ブランチにコミット・push 済み。
 
@@ -165,7 +184,8 @@ unpaid → pending_confirmation → confirmed
 
 | ファイル | 分類 | 主な関数 |
 |---|---|---|
-| `admin.actions.ts` | `'use server'` + Admin SDK | `getCurrentUserRoleAdmin`, `searchUserByEmailAdmin`, `addMemberToCircleAdmin`, `promoteToOrganizerAdmin`, `demoteToMemberAdmin`, `removeMemberAdmin`, `recordAttendanceAdmin`, `qrCheckInAdmin`, `createCircleAdmin` |
+| `notification.actions.ts` | `'use server'` + Admin SDK | `sendNotificationToAllMembers`, `sendPaymentReminder`, `sendAttendanceReminder`, `notifyEventCreated`, `getNotificationLogs` |
+| `admin.actions.ts` | `'use server'` + Admin SDK | `getCurrentUserRoleAdmin`, `searchUserByEmailAdmin`, `addMemberToCircleAdmin`, `promoteToOrganizerAdmin`, `demoteToMemberAdmin`, `removeMemberAdmin`, `recordAttendanceAdmin`, `qrCheckInAdmin`, `createCircleAdmin`, `createEventAdmin` |
 | `analytics.actions.ts` | `'use server'` + Admin SDK | `getCircleStatsAdmin`（月別統計）, `getUnpaidMembersAdmin` |
 | `profile.actions.ts` | `'use server'` + Admin SDK | `updateUserProfileAdmin`（displayName + photoURL、全サークル一括同期） |
 | `circle.actions.ts` | クライアント SDK | `getCircle`, `getCurrentUserRole`, `getCirclesForUser`, `createCircle` |
@@ -223,10 +243,12 @@ unpaid → pending_confirmation → confirmed
 
 ## 🚀 次のステップ (Next Actions)
 
-1. **Vercel 環境変数の確認** — Admin SDK の3変数 (`FIREBASE_ADMIN_*`) が Vercel に設定されているか確認。未設定ならアナリティクス等が動かない。
-2. **Firebase Storage ルールのデプロイ** — `storage.rules` を Firebase Console → Storage → ルール に貼り付けてデプロイ（プロフィール写真アップロードに必要）。
-3. **Firestore セキュリティルールの強化** — 現状は認証済みユーザー全員に書き込み権限。Admin SDK 経由に絞る方向で再定義を検討。
-4. **プッシュ通知の実機テスト** — iOS端末でPWAとしてインストールし、通知受信テストを継続。
+1. **Firestoreに複合インデックスを作成** — Firebase Console → Firestore → インデックス → 複合を追加：
+   - コレクション: `notificationLogs` / フィールド1: `circleId`（昇順）/ フィールド2: `sentAt`（降順）
+2. **Vercel 環境変数の確認** — Admin SDK の3変数 (`FIREBASE_ADMIN_*`) が Vercel に設定されているか確認。
+3. **Firebase Storage ルールのデプロイ** — `storage.rules` を Firebase Console → Storage → ルール に貼り付けてデプロイ。
+4. **Firestore セキュリティルールの強化** — 現状は認証済みユーザー全員に書き込み権限。Admin SDK 経由に絞る方向で再定義を検討。
+5. **プッシュ通知の実機テスト** — iOS端末でPWAとしてインストールし、通知受信テストを継続。
 
 ---
 

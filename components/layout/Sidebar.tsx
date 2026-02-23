@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 const navItems = [
   { href: '/dashboard', label: 'ホーム', emoji: '🏠' },
@@ -16,6 +17,7 @@ const navItems = [
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const { user, signOut } = useAuthContext();
+  const { permissionState, requestPermission } = useNotifications(user?.uid);
 
   return (
     <div className="flex h-full flex-col p-3">
@@ -71,6 +73,16 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
             ログアウト
           </button>
+          {/* 通知許可ボタン（未許可の場合のみ表示） */}
+          {permissionState !== 'granted' && permissionState !== 'unsupported' && (
+            <button
+              className="mt-1 flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-[13px] text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-foreground"
+              onClick={requestPermission}
+            >
+              <span className="text-sm">🔔</span>
+              通知をオンにする
+            </button>
+          )}
         </div>
       )}
     </div>

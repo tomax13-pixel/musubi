@@ -596,3 +596,48 @@ export async function qrCheckInAdmin(
 
     return { success: true, displayName: memberData?.displayName };
 }
+
+// =====================
+// Event Management
+// =====================
+
+export async function createEventAdmin(
+    circleId: string,
+    input: {
+        name: string;
+        description: string;
+        date: string; // ISO string
+        location: string;
+        fee: number;
+    },
+    currentUserUid: string
+): Promise<string> {
+    const isOrg = await isOrganizer(circleId, currentUserUid);
+    if (!isOrg) throw new Error('オーガナイザーのみイベントを作成できます');
+
+    const eventRef = adminDb.collection('circles').doc(circleId).collection('events').doc();
+    const now = FieldValue.serverTimestamp();
+
+    await eventRef.set({
+        circleId,
+        name: input.name,
+        description: input.description,
+        date: new Date(input.date),
+        location: input.location,
+        fee: input.fee,
+        createdBy: currentUserUid,
+        createdAt: now,
+        updatedAt: now,
+    });
+
+    // 全メンバーにプッシュ通知を送る（非同期・失敗しても続行）
+    try {
+        const { notifyEventCreated } = await import('./notification.actions');
+        await notifyEventCreated(circleId, eventRef.id, input.name, currentUserUid);
+    } catch (err) {
+        console.error('通知送信に失敗しました（イベントは正常に作成されました）:', err);
+    }
+
+    revalidatePath(`/circles/${circleId}`);
+    return eventRef.id;
+}

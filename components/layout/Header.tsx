@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Sidebar } from './Sidebar';
 
 export function Header() {
@@ -19,6 +19,7 @@ export function Header() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-60 p-0">
+          <SheetTitle className="sr-only">ナビゲーションメニュー</SheetTitle>
           <Sidebar onClose={() => setOpen(false)} />
         </SheetContent>
       </Sheet>

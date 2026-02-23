@@ -115,7 +115,7 @@ export interface NotificationLog {
   circleId: string;
   eventId: string;
   recipientUid: string;
-  type: 'payment_reminder';
+  type: 'event_created' | 'payment_reminder' | 'attendance_reminder';
   sentAt: Timestamp;
   sentBy: string;
   title: string;
@@ -155,4 +155,51 @@ export interface SendReminderInput {
   eventId: string;
   eventName: string;
   amount: number;
+}
+
+// =====================
+// Poll (スマート日程調整)
+// =====================
+
+/** ⭕️ ok / 🔺 maybe / ❌ ng */
+export type VoteResponse = 'ok' | 'maybe' | 'ng';
+
+/** circles/{circleId}/polls/{pollId} の candidateDates 要素 */
+export interface PollCandidateDate {
+  id: string;
+  date: Timestamp;
+  label?: string;
+}
+
+/** circles/{circleId}/polls/{pollId} */
+export interface Poll {
+  id: string;
+  circleId: string;
+  title: string;
+  description?: string;
+  candidateDates: PollCandidateDate[];
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  status: 'open' | 'closed';
+  deadline?: Timestamp;
+}
+
+/** circles/{circleId}/polls/{pollId}/votes/{uid} */
+export interface PollVote {
+  uid: string;
+  pollId: string;
+  circleId: string;
+  displayName: string;
+  photoURL: string | null;
+  responses: Record<string, VoteResponse>;
+  votedAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface CreatePollInput {
+  title: string;
+  description?: string;
+  candidateDates: Array<{ id: string; date: Date; label?: string }>;
+  deadline?: Date;
 }

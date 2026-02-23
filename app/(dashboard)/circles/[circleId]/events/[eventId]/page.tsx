@@ -11,6 +11,7 @@ import { getPaymentsForEvent } from '@/lib/actions/payment.actions';
 import type { Event, PaymentRecord } from '@/lib/types/models';
 import { formatDate, formatAmount } from '@/lib/utils/date';
 import { PAYMENT_STATUS_CONFIG } from '@/lib/constants/paymentStatus';
+import { SendNotificationPanel } from '@/components/notifications/SendNotificationPanel';
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -144,6 +145,16 @@ export default function EventDetailPage() {
             </Link>
           )}
         </div>
+      )}
+
+      {/* 通知送信パネル（幹事のみ） */}
+      {isOrganizer && user && (
+        <SendNotificationPanel
+          circleId={circleId}
+          eventId={eventId}
+          eventName={event.name}
+          currentUserUid={user.uid}
+        />
       )}
     </div>
   );
