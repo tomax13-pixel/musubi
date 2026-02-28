@@ -7,8 +7,13 @@ import { Plus, Calendar } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getCircle, getCurrentUserRole } from '@/lib/actions/circle.actions';
 import { getEventsForCircle } from '@/lib/actions/event.actions';
+import { getPollsForCircle } from '@/lib/actions/poll.actions';
 import type { Circle, Event } from '@/lib/types/models';
 import { formatDate, formatAmount } from '@/lib/utils/date';
+import { InviteLinkButton } from '@/components/circles/InviteLinkButton';
+import { EventCalendar } from '@/components/events/EventCalendar';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
 
 export default function CircleDetailPage() {
   const params = useParams();
@@ -17,6 +22,7 @@ export default function CircleDetailPage() {
 
   const [circle, setCircle] = useState<Circle | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [polls, setPolls] = useState<any[]>([]);
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -26,10 +32,12 @@ export default function CircleDetailPage() {
       getCircle(circleId),
       getEventsForCircle(circleId),
       getCurrentUserRole(circleId, user.uid),
-    ]).then(([c, e, role]) => {
+      getPollsForCircle(circleId),
+    ]).then(([c, e, role, p]) => {
       setCircle(c);
       setEvents(e);
       setIsOrganizer(role === 'organizer');
+      setPolls(p);
     }).finally(() => setLoading(false));
   }, [circleId, user]);
 
@@ -56,7 +64,8 @@ export default function CircleDetailPage() {
           </div>
         </div>
         {isOrganizer && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <InviteLinkButton circleId={circleId} currentUserUid={user!.uid} />
             <Link
               href={`/circles/${circleId}/members`}
               className="rounded-md border border-neutral-200 px-3 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
@@ -79,7 +88,7 @@ export default function CircleDetailPage() {
         )}
       </div>
 
-      {/* Events section */}
+      {/* Events section - Calendar */}
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -115,26 +124,64 @@ export default function CircleDetailPage() {
             )}
           </div>
         ) : (
+          <EventCalendar events={events} circleId={circleId} />
+        )}
+      </div>
+
+      {/* Polls section */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
+            🗳️ 日程調整
+          </h2>
+          {isOrganizer && (
+            <Link
+              href={`/circles/${circleId}/polls/create`}
+              className="flex items-center gap-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+              新規作成
+            </Link>
+          )}
+        </div>
+
+        {polls.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-md border border-dashed py-10 text-center">
+            <p className="text-3xl">🗳️</p>
+            <div>
+              <p className="text-sm font-medium">日程調整がありません</p>
+              {isOrganizer && (
+                <p className="mt-1 text-[13px] text-muted-foreground">メンバーの都合を確認しましょう</p>
+              )}
+            </div>
+          </div>
+        ) : (
           <div className="divide-y border-t">
-            {events.map((event) => (
+            {polls.map((poll) => (
               <Link
-                key={event.id}
-                href={`/circles/${circleId}/events/${event.id}`}
+                key={poll.id}
+                href={`/circles/${circleId}/polls/${poll.id}`}
                 className="flex items-center gap-4 py-3 transition-colors hover:bg-neutral-50"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{event.name}</p>
-                  <p className="mt-0.5 flex items-center gap-3 text-[12px] text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" strokeWidth={1.5} />
-                      {formatDate(event.date)}
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{poll.title}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${poll.status === 'open'
+                      ? 'bg-green-50 text-green-700'
+                      : 'bg-neutral-100 text-neutral-500'
+                      }`}>
+                      {poll.status === 'open' ? '受付中' : '締め切り'}
                     </span>
-                    {event.location && <span>{event.location}</span>}
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">
+                    📅 {poll.candidateDates.length}つの候補日
+                    {poll.deadline && (
+                      <span className="ml-2">
+                        🕐 〜{format(new Date(poll.deadline), 'M/d(E)', { locale: ja })}
+                      </span>
+                    )}
                   </p>
                 </div>
-                <span className="text-[13px] font-medium tabular-nums">
-                  {formatAmount(event.fee)}
-                </span>
                 <span className="text-[12px] text-muted-foreground">→</span>
               </Link>
             ))}
