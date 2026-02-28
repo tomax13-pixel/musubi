@@ -112,3 +112,121 @@ export async function submitPollVoteAdmin(
   const saved = await voteRef.get();
   return serializeDoc({ ...saved.data() });
 }
+
+/**
+ * サークル内の全アンケート一覧を取得（新しい順）
+ */
+export async function getPollsForCircle(circleId: string) {
+  const snap = await adminDb
+    .collection('circles')
+    .doc(circleId)
+    .collection('polls')
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return snap.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      circleId: data.circleId,
+      title: data.title,
+      description: data.description ?? '',
+      candidateDates: (data.candidateDates ?? []).map((c: any) => ({
+        id: c.id,
+        date: c.date?.toDate().toISOString() ?? null,
+        label: c.label ?? '',
+      })),
+      createdBy: data.createdBy,
+      createdAt: data.createdAt?.toDate().toISOString() ?? null,
+      updatedAt: data.updatedAt?.toDate().toISOString() ?? null,
+      status: data.status,
+      deadline: data.deadline?.toDate().toISOString() ?? null,
+    };
+  });
+}
+
+/**
+ * アンケート詳細＋全投票結果を取得
+ */
+export async function getPollWithVotes(circleId: string, pollId: string) {
+  // アンケート本体
+  const pollSnap = await adminDb
+    .collection('circles')
+    .doc(circleId)
+    .collection('polls')
+    .doc(pollId)
+    .get();
+
+  if (!pollSnap.exists) return null;
+
+  const pollData = pollSnap.data()!;
+  const poll = {
+    id: pollSnap.id,
+    circleId: pollData.circleId,
+    title: pollData.title,
+    description: pollData.description ?? '',
+    candidateDates: (pollData.candidateDates ?? []).map((c: any) => ({
+      id: c.id,
+      date: c.date?.toDate().toISOString() ?? null,
+      label: c.label ?? '',
+    })),
+    createdBy: pollData.createdBy,
+    createdAt: pollData.createdAt?.toDate().toISOString() ?? null,
+    updatedAt: pollData.updatedAt?.toDate().toISOString() ?? null,
+    status: pollData.status,
+    deadline: pollData.deadline?.toDate().toISOString() ?? null,
+  };
+
+  // 全投票結果
+  const votesSnap = await adminDb
+    .collection('circles')
+    .doc(circleId)
+    .collection('polls')
+    .doc(pollId)
+    .collection('votes')
+    .get();
+
+  const votes = votesSnap.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      uid: data.uid,
+      pollId: data.pollId,
+      circleId: data.circleId,
+      displayName: data.displayName,
+      photoURL: data.photoURL ?? null,
+      responses: data.responses ?? {},
+      votedAt: data.votedAt?.toDate().toISOString() ?? null,
+      updatedAt: data.updatedAt?.toDate().toISOString() ?? null,
+    };
+  });
+
+  return { poll, votes };
+}
+
+/**
+ * 幹事がアンケートを締め切る
+ */
+export async function closePollAdmin(
+  circleId: string,
+  pollId: string,
+  currentUserUid: string,
+) {
+  const role = await getCurrentUserRoleAdmin(circleId, currentUserUid);
+  if (role !== 'organizer') throw new Error('幹事のみアンケートを締め切れます');
+
+  const pollRef = adminDb
+    .collection('circles')
+    .doc(circleId)
+    .collection('polls')
+    .doc(pollId);
+
+  const pollSnap = await pollRef.get();
+  if (!pollSnap.exists) throw new Error('アンケートが見つかりません');
+
+  await pollRef.update({
+    status: 'closed',
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  revalidatePath(`/circles/${circleId}`);
+}
