@@ -14,7 +14,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/login', '/invite'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -24,12 +24,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const isPublic = PUBLIC_PATHS.includes(pathname);
+    const isPublic = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
 
     if (!user && !isPublic) {
       router.push('/login');
-    } else if (user && isPublic) {
-      router.push('/dashboard');
+    } else if (user && pathname === '/login') {
+      // ログイン後のリダイレクト先を確認
+      const redirect = typeof window !== 'undefined'
+        ? sessionStorage.getItem('redirectAfterLogin')
+        : null;
+      if (redirect) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        router.push(redirect);
+      } else {
+        router.push('/dashboard');
+      }
     }
   }, [user, loading, pathname, router]);
 

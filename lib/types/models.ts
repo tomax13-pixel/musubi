@@ -124,6 +124,17 @@ export interface NotificationLog {
   error?: string;
 }
 
+/** circles/{circleId}/invites/{inviteId} */
+export interface CircleInvite {
+  id: string;
+  circleId: string;
+  code: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+  isActive: boolean;
+}
+
 // =====================
 // Form Input Types
 // =====================
