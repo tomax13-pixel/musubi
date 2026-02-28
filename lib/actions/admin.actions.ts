@@ -598,6 +598,119 @@ export async function qrCheckInAdmin(
 }
 
 // =====================
+// Payment Management
+// =====================
+
+export async function getPaymentsForEventAdmin(circleId: string, eventId: string) {
+    const snap = await adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments')
+        .get();
+
+    return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            eventId: data.eventId,
+            circleId: data.circleId,
+            uid: data.uid ?? null,
+            guestId: data.guestId ?? null,
+            isGuest: data.isGuest,
+            amount: data.amount,
+            status: data.status,
+            displayName: data.displayName,
+            email: data.email ?? null,
+            markedPaidAt: data.markedPaidAt?.toDate().toISOString() ?? null,
+            markedPaidBy: data.markedPaidBy ?? null,
+            confirmedAt: data.confirmedAt?.toDate().toISOString() ?? null,
+            confirmedBy: data.confirmedBy ?? null,
+            createdAt: data.createdAt?.toDate().toISOString() ?? null,
+            updatedAt: data.updatedAt?.toDate().toISOString() ?? null,
+        };
+    });
+}
+
+/** メンバーが自分の支払いを「支払い済み」としてマーク */
+export async function markAsPaidAdmin(
+    circleId: string,
+    eventId: string,
+    currentUserUid: string
+) {
+    const paymentRef = adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments').doc(currentUserUid);
+
+    const snap = await paymentRef.get();
+    if (!snap.exists) throw new Error('支払い記録が見つかりません');
+
+    const data = snap.data();
+    if (data?.status === 'confirmed') throw new Error('すでに確認済みです');
+
+    await paymentRef.update({
+        status: 'pending_confirmation',
+        markedPaidAt: FieldValue.serverTimestamp(),
+        markedPaidBy: currentUserUid,
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
+}
+
+/** 幹事が支払いを確認 */
+export async function confirmPaymentAdmin(
+    circleId: string,
+    eventId: string,
+    paymentId: string,
+    currentUserUid: string
+) {
+    const isOrg = await isOrganizer(circleId, currentUserUid);
+    if (!isOrg) throw new Error('オーガナイザーのみ確認できます');
+
+    const paymentRef = adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments').doc(paymentId);
+
+    await paymentRef.update({
+        status: 'confirmed',
+        confirmedAt: FieldValue.serverTimestamp(),
+        confirmedBy: currentUserUid,
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
+}
+
+/** 幹事が支払いを未払いにリセット */
+export async function resetPaymentAdmin(
+    circleId: string,
+    eventId: string,
+    paymentId: string,
+    currentUserUid: string
+) {
+    const isOrg = await isOrganizer(circleId, currentUserUid);
+    if (!isOrg) throw new Error('オーガナイザーのみリセットできます');
+
+    const paymentRef = adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments').doc(paymentId);
+
+    await paymentRef.update({
+        status: 'unpaid',
+        markedPaidAt: null,
+        markedPaidBy: null,
+        confirmedAt: null,
+        confirmedBy: null,
+        updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
+}
+
+// =====================
 // Event Management
 // =====================
 

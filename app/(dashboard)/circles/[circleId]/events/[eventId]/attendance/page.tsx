@@ -5,11 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { getCircleMembers, getCurrentUserRole } from '@/lib/actions/circle.actions';
-import { getActiveGuests } from '@/lib/actions/guest.actions';
-import { recordAttendance, getAttendanceForEvent, type AttendeeInput } from '@/lib/actions/attendance.actions';
-import { getEvent } from '@/lib/actions/event.actions';
+import { getCircleMembersAdmin, getCurrentUserRoleAdmin, recordAttendanceAdmin, getAttendanceForEventAdmin, getEventAdmin, getActiveGuestsAdmin } from '@/lib/actions/admin.actions';
 import type { CircleMember, Guest, AttendanceRecord, Event } from '@/lib/types/models';
+import type { AttendeeInput } from '@/lib/actions/attendance.actions';
 
 interface AttendeeRow {
   id: string;
@@ -36,20 +34,20 @@ export default function AttendancePage() {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const role = await getCurrentUserRole(circleId, user.uid);
+    const role = await getCurrentUserRoleAdmin(circleId, user.uid);
     if (role !== 'organizer') {
       router.push(`/circles/${circleId}/events/${eventId}`);
       return;
     }
 
     const [members, guests, existing, evt] = await Promise.all([
-      getCircleMembers(circleId),
-      getActiveGuests(circleId),
-      getAttendanceForEvent(circleId, eventId),
-      getEvent(circleId, eventId),
+      getCircleMembersAdmin(circleId),
+      getActiveGuestsAdmin(circleId),
+      getAttendanceForEventAdmin(circleId, eventId),
+      getEventAdmin(circleId, eventId),
     ]);
 
-    setEvent(evt);
+    setEvent(evt as any);
 
     const existingMap = new Map<string, AttendanceRecord>(
       existing.map((r) => [r.id, r])
@@ -104,7 +102,7 @@ export default function AttendancePage() {
         uid: a.uid,
         guestId: a.guestId,
       }));
-      await recordAttendance(circleId, eventId, inputs, user.uid);
+      await recordAttendanceAdmin(circleId, eventId, inputs, user.uid);
       toast.success('出欠を記録しました。支払い記録が自動生成されました。');
       router.push(`/circles/${circleId}/events/${eventId}`);
     } catch (err) {

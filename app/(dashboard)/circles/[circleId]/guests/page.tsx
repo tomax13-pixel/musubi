@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Plus, Trash2 } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { getCurrentUserRole } from '@/lib/actions/circle.actions';
-import { addGuest, getActiveGuests, deactivateGuest } from '@/lib/actions/guest.actions';
+import { getCurrentUserRoleAdmin } from '@/lib/actions/admin.actions';
+import { addGuestAdmin, getActiveGuestsAdmin, deactivateGuestAdmin } from '@/lib/actions/admin.actions';
 import type { Guest } from '@/lib/types/models';
 
 export default function GuestsPage() {
@@ -28,8 +28,8 @@ export default function GuestsPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     const [g, role] = await Promise.all([
-      getActiveGuests(circleId),
-      getCurrentUserRole(circleId, user.uid),
+      getActiveGuestsAdmin(circleId),
+      getCurrentUserRoleAdmin(circleId, user.uid),
     ]);
 
     if (role !== 'organizer') {
@@ -49,7 +49,7 @@ export default function GuestsPage() {
     if (!user || !name.trim()) return;
     setSubmitting(true);
     try {
-      await addGuest(
+      await addGuestAdmin(
         circleId,
         {
           name: name.trim(),
@@ -76,7 +76,7 @@ export default function GuestsPage() {
   const handleRemove = async (guestId: string, guestName: string) => {
     if (!user) return;
     try {
-      await deactivateGuest(circleId, guestId, user.uid);
+      await deactivateGuestAdmin(circleId, guestId, user.uid);
       toast.success(`${guestName}さんを削除しました`);
       await loadData();
     } catch (err) {

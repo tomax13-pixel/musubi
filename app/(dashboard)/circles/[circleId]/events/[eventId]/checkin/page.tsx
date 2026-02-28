@@ -3,9 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { getCurrentUserRole } from '@/lib/actions/circle.actions';
-import { getEvent } from '@/lib/actions/event.actions';
-import { qrCheckIn } from '@/lib/actions/attendance.actions';
+import { getCurrentUserRoleAdmin, getEventAdmin, qrCheckInAdmin } from '@/lib/actions/admin.actions';
 import type { Event } from '@/lib/types/models';
 import { formatDate } from '@/lib/utils/date';
 import { ArrowLeft, Camera, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
@@ -41,10 +39,10 @@ export default function QRCheckInPage() {
     useEffect(() => {
         if (!user) return;
         Promise.all([
-            getEvent(circleId, eventId),
-            getCurrentUserRole(circleId, user.uid),
+            getEventAdmin(circleId, eventId),
+            getCurrentUserRoleAdmin(circleId, user.uid),
         ]).then(([e, role]) => {
-            setEvent(e);
+            setEvent(e as any);
             setIsOrganizer(role === 'organizer');
         }).finally(() => setLoading(false));
     }, [circleId, eventId, user]);
@@ -82,7 +80,7 @@ export default function QRCheckInPage() {
             }
 
             setProcessing(true);
-            const result = await qrCheckIn(circleId, eventId, parsed.uid, user.uid);
+            const result = await qrCheckInAdmin(circleId, eventId, parsed.uid, user.uid);
 
             if (result.success) {
                 setLastResult({
@@ -243,11 +241,10 @@ export default function QRCheckInPage() {
             {/* 開始/停止ボタン */}
             <button
                 onClick={scanning ? stopCamera : startCamera}
-                className={`w-full rounded-md px-4 py-3 text-sm font-medium transition-colors ${
-                    scanning
+                className={`w-full rounded-md px-4 py-3 text-sm font-medium transition-colors ${scanning
                         ? 'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50'
                         : 'bg-foreground text-background hover:bg-neutral-800'
-                }`}
+                    }`}
             >
                 {scanning ? '⏹ スキャンを停止' : '📷 スキャンを開始'}
             </button>
@@ -255,11 +252,10 @@ export default function QRCheckInPage() {
             {/* 最新結果 */}
             {lastResult && (
                 <div
-                    className={`flex items-center gap-3 rounded-lg border p-4 ${
-                        lastResult.success
+                    className={`flex items-center gap-3 rounded-lg border p-4 ${lastResult.success
                             ? 'border-neutral-200 bg-neutral-50'
                             : 'border-neutral-200 bg-white'
-                    }`}
+                        }`}
                 >
                     {lastResult.success ? (
                         <CheckCircle2 className="h-5 w-5 shrink-0 text-neutral-700" />

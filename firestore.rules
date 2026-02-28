@@ -4,41 +4,45 @@ service cloud.firestore {
 
     // ユーザー自身のドキュメント
     // プロフィール検索(searchUserByEmail)のため、認証済みユーザー全員に読み取り権限を付与
-    // 書き込みは本人のみ
+    // 書き込みは本人のみ（学部・学年・FCMトークンの更新用）
     match /users/{uid} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
 
     // サークル関連
-    // クライアントサイドでの作成・更新ロジックがあるため、
-    // 現状は認証済みユーザーに対して広めの権限を設定しています。
-    // 将来的にはServer Actions(Admin SDK)への移行を推奨します。
+    // 全書き込みはAdmin SDK（Server Actions）経由で行うため、クライアント側は読み取りのみ
     match /circles/{circleId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if false;
 
       match /members/{memberId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if false;
       }
 
       match /events/{eventId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if false;
 
         match /attendance/{attendanceId} {
-          allow read, write: if request.auth != null;
+          allow read: if request.auth != null;
+          allow write: if false;
         }
 
         match /payments/{paymentId} {
-          allow read, write: if request.auth != null;
+          allow read: if request.auth != null;
+          allow write: if false;
         }
 
         match /guests/{guestId} {
-          allow read, write: if request.auth != null;
+          allow read: if request.auth != null;
+          allow write: if false;
         }
       }
     }
 
-    // ★ collectionGroupクエリ用（ルートレベルのワイルドカード）
+    // ★ collectionGroupクエリ用（ルートレベルのワイルドカード）— 読み取りのみ
     match /{path=**}/attendance/{docId} {
       allow read: if request.auth != null;
     }
@@ -51,11 +55,25 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
-    // 通知ログ
+    // 招待コード — Admin SDK経由のみ。クライアントからの読み書き不要
+    match /{path=**}/invites/{docId} {
+      allow read: if false;
+    }
+
+    // 日程調整アンケート — Admin SDK経由のみ
+    match /circles/{circleId}/polls/{pollId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /circles/{circleId}/polls/{pollId}/votes/{voteId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // 通知ログ — Admin SDK経由のみ
     match /notificationLogs/{logId} {
       allow read: if request.auth != null;
-      // ログの作成は通常サーバー側で行うため、writeは制限することを推奨（現状は維持）
-      allow write: if request.auth != null;
+      allow write: if false;
     }
   }
 }

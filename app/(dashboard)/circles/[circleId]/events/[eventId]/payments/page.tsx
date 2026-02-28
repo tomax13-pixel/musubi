@@ -5,9 +5,7 @@ import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Bell, Check, RotateCcw } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { getCurrentUserRole } from '@/lib/actions/circle.actions';
-import { getPaymentsForEvent, markAsPaid, confirmPayment, resetPayment } from '@/lib/actions/payment.actions';
-import { getEvent } from '@/lib/actions/event.actions';
+import { getCurrentUserRoleAdmin, getPaymentsForEventAdmin, markAsPaidAdmin, confirmPaymentAdmin, resetPaymentAdmin, getEventAdmin } from '@/lib/actions/admin.actions';
 import { PaymentStatusBadge } from '@/components/payments/PaymentStatusBadge';
 import type { PaymentRecord, Event } from '@/lib/types/models';
 import { formatAmount } from '@/lib/utils/date';
@@ -27,14 +25,14 @@ export default function PaymentsPage() {
   const loadData = useCallback(async () => {
     if (!user) return;
     const [evt, pmts, role] = await Promise.all([
-      getEvent(circleId, eventId),
-      getPaymentsForEvent(circleId, eventId),
-      getCurrentUserRole(circleId, user.uid),
+      getEventAdmin(circleId, eventId),
+      getPaymentsForEventAdmin(circleId, eventId),
+      getCurrentUserRoleAdmin(circleId, user.uid),
     ]);
-    setEvent(evt);
-    setPayments(pmts.sort((a, b) => {
-      const order = { unpaid: 0, pending_confirmation: 1, confirmed: 2 };
-      return order[a.status] - order[b.status];
+    setEvent(evt as any);
+    setPayments((pmts as any[]).sort((a: any, b: any) => {
+      const order: Record<string, number> = { unpaid: 0, pending_confirmation: 1, confirmed: 2 };
+      return (order[a.status] ?? 3) - (order[b.status] ?? 3);
     }));
     setIsOrganizer(role === 'organizer');
     setLoading(false);
@@ -46,7 +44,7 @@ export default function PaymentsPage() {
     if (!user) return;
     setActionLoading(paymentId);
     try {
-      await markAsPaid(circleId, eventId, user.uid);
+      await markAsPaidAdmin(circleId, eventId, user.uid);
       toast.success('支払い済みとしてマークしました');
       await loadData();
     } catch (err) {
@@ -60,7 +58,7 @@ export default function PaymentsPage() {
     if (!user) return;
     setActionLoading(paymentId);
     try {
-      await confirmPayment(circleId, eventId, paymentId, user.uid);
+      await confirmPaymentAdmin(circleId, eventId, paymentId, user.uid);
       toast.success('支払いを確認しました');
       await loadData();
     } catch (err) {
@@ -74,7 +72,7 @@ export default function PaymentsPage() {
     if (!user) return;
     setActionLoading(paymentId);
     try {
-      await resetPayment(circleId, eventId, paymentId, user.uid);
+      await resetPaymentAdmin(circleId, eventId, paymentId, user.uid);
       toast.success('未払いにリセットしました');
       await loadData();
     } catch (err) {

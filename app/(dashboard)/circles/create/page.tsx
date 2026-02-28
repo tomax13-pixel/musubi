@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { createCircle } from '@/lib/actions/circle.actions';
+import { createCircleAdmin } from '@/lib/actions/admin.actions';
 import { EmojiPicker } from '@/components/circles/EmojiPicker';
 
 export default function CreateCirclePage() {
@@ -24,7 +24,7 @@ export default function CreateCirclePage() {
 
     setSubmitting(true);
     try {
-      const id = await createCircle(
+      const id = await createCircleAdmin(
         { name: name.trim(), emoji, description: description.trim() },
         {
           uid: user.uid,
