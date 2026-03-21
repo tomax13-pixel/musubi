@@ -754,3 +754,191 @@ export async function createEventAdmin(
     revalidatePath(`/circles/${circleId}`);
     return eventRef.id;
 }
+
+// =====================
+// Event Edit / Delete
+// =====================
+
+export async function updateEventAdmin(
+    circleId: string,
+    eventId: string,
+    input: {
+        name?: string;
+        description?: string;
+        date?: string;
+        location?: string;
+        fee?: number;
+    },
+    currentUserUid: string
+) {
+    const isOrg = await isOrganizer(circleId, currentUserUid);
+    if (!isOrg) throw new Error('オーガナイザーのみイベントを編集できます');
+
+    const eventRef = adminDb.collection('circles').doc(circleId).collection('events').doc(eventId);
+    const eventDoc = await eventRef.get();
+    if (!eventDoc.exists) throw new Error('イベントが見つかりません');
+
+    const updateData: Record<string, unknown> = {
+        updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (input.name !== undefined) updateData['name'] = input.name;
+    if (input.description !== undefined) updateData['description'] = input.description;
+    if (input.date !== undefined) updateData['date'] = new Date(input.date);
+    if (input.location !== undefined) updateData['location'] = input.location;
+    if (input.fee !== undefined) updateData['fee'] = input.fee;
+
+    await eventRef.update(updateData);
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}`);
+    revalidatePath(`/circles/${circleId}`);
+}
+
+export async function deleteEventAdmin(
+    circleId: string,
+    eventId: string,
+    currentUserUid: string
+) {
+    const isOrg = await isOrganizer(circleId, currentUserUid);
+    if (!isOrg) throw new Error('オーガナイザーのみイベントを削除できます');
+
+    const eventRef = adminDb.collection('circles').doc(circleId).collection('events').doc(eventId);
+    const eventDoc = await eventRef.get();
+    if (!eventDoc.exists) throw new Error('イベントが見つかりません');
+
+    // Delete attendance subcollection
+    const attendanceDocs = await eventRef.collection('attendance').get();
+    const batch1 = adminDb.batch();
+    attendanceDocs.docs.forEach(doc => batch1.delete(doc.ref));
+    if (!attendanceDocs.empty) await batch1.commit();
+
+    // Delete payments subcollection
+    const paymentDocs = await eventRef.collection('payments').get();
+    const batch2 = adminDb.batch();
+    paymentDocs.docs.forEach(doc => batch2.delete(doc.ref));
+    if (!paymentDocs.empty) await batch2.commit();
+
+    // Delete event document
+    await eventRef.delete();
+
+    revalidatePath(`/circles/${circleId}`);
+}
+
+// =====================
+// Member Self-Attendance Response
+// =====================
+
+export async function respondAttendanceAdmin(
+    circleId: string,
+    eventId: string,
+    uid: string,
+    response: 'attend' | 'absent',
+    displayName: string,
+    email?: string,
+    photoURL?: string | null
+) {
+    // Verify user is a member
+    const memberDoc = await adminDb.collection('circles').doc(circleId).collection('members').doc(uid).get();
+    if (!memberDoc.exists) throw new Error('サークルのメンバーではありません');
+
+    // Verify event exists
+    const eventRef = adminDb.collection('circles').doc(circleId).collection('events').doc(eventId);
+    const eventDoc = await eventRef.get();
+    if (!eventDoc.exists) throw new Error('イベントが見つかりません');
+
+    const attendanceRef = eventRef.collection('attendance').doc(uid);
+    const now = FieldValue.serverTimestamp();
+
+    if (response === 'attend') {
+        await attendanceRef.set({
+            eventId,
+            circleId,
+            isGuest: false,
+            uid,
+            attended: true,
+            checkedInAt: null,
+            checkedInBy: '',
+            displayName,
+            email: email || '',
+            photoURL: photoURL || null,
+        }, { merge: true });
+
+        // Auto-generate payment record if fee > 0
+        const fee = eventDoc.data()?.fee ?? 0;
+        if (fee > 0) {
+            const paymentRef = eventRef.collection('payments').doc(uid);
+            const paymentDoc = await paymentRef.get();
+            if (!paymentDoc.exists) {
+                await paymentRef.set({
+                    eventId,
+                    circleId,
+                    isGuest: false,
+                    uid,
+                    amount: fee,
+                    status: 'unpaid',
+                    markedPaidAt: null,
+                    confirmedAt: null,
+                    createdAt: now,
+                    updatedAt: now,
+                    displayName,
+                    email: email || '',
+                });
+            }
+        }
+    } else {
+        // Mark as not attending
+        await attendanceRef.set({
+            eventId,
+            circleId,
+            isGuest: false,
+            uid,
+            attended: false,
+            checkedInAt: null,
+            checkedInBy: '',
+            displayName,
+            email: email || '',
+            photoURL: photoURL || null,
+        }, { merge: true });
+    }
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}`);
+}
+
+export async function getMyAttendanceAdmin(
+    circleId: string,
+    eventId: string,
+    uid: string
+) {
+    const doc = await adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('attendance').doc(uid)
+        .get();
+
+    if (!doc.exists) return null;
+    return serializeDoc({ id: doc.id, ...doc.data() });
+}
+
+// =====================
+// Circle Leave
+// =====================
+
+export async function leaveCircleAdmin(circleId: string, uid: string) {
+    const memberRef = adminDb.collection('circles').doc(circleId).collection('members').doc(uid);
+    const memberDoc = await memberRef.get();
+
+    if (!memberDoc.exists) throw new Error('サークルのメンバーではありません');
+
+    // If organizer, check that at least one other organizer remains
+    if (memberDoc.data()?.role === 'organizer') {
+        const membersRef = adminDb.collection('circles').doc(circleId).collection('members');
+        const organizersSnapshot = await membersRef.where('role', '==', 'organizer').get();
+        if (organizersSnapshot.size <= 1) {
+            throw new Error('最後のオーガナイザーは脱退できません。他のメンバーをオーガナイザーに昇格してから脱退してください。');
+        }
+    }
+
+    await memberRef.delete();
+
+    revalidatePath(`/circles/${circleId}`);
+    revalidatePath('/dashboard');
+}

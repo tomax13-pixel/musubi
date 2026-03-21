@@ -10,6 +10,12 @@ import { getCurrentUserRole } from '@/lib/actions/circle.actions';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 type VoteValue = 'ok' | 'maybe' | 'ng';
 
@@ -32,6 +38,7 @@ export default function PollDetailPage() {
     const [myResponses, setMyResponses] = useState<Record<string, VoteValue>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isClosing, setIsClosing] = useState(false);
+    const [closeDialogOpen, setCloseDialogOpen] = useState(false);
 
     useEffect(() => {
         if (!user) return;
@@ -83,12 +90,9 @@ export default function PollDetailPage() {
         return maxOk > 0 ? bestId : null;
     }, [data, summary]);
 
-    const toggleVote = (dateId: string) => {
+    const setVote = (dateId: string, value: VoteValue) => {
         if (data?.poll.status === 'closed') return;
-        const current = myResponses[dateId];
-        const order: VoteValue[] = ['ok', 'maybe', 'ng'];
-        const nextIndex = current ? (order.indexOf(current) + 1) % 3 : 0;
-        setMyResponses((prev) => ({ ...prev, [dateId]: order[nextIndex]! }));
+        setMyResponses((prev) => ({ ...prev, [dateId]: value }));
     };
 
     const handleSubmitVote = async () => {
@@ -116,7 +120,7 @@ export default function PollDetailPage() {
 
     const handleClose = async () => {
         if (!user) return;
-        if (!confirm('アンケートを締め切りますか？締め切り後はメンバーが回答できなくなります。')) return;
+        setCloseDialogOpen(false);
         setIsClosing(true);
         try {
             await closePollAdmin(circleId, pollId, user.uid);
@@ -178,7 +182,7 @@ export default function PollDetailPage() {
                 <table className="w-full border-collapse text-[13px]">
                     <thead>
                         <tr>
-                            <th className="border-b border-neutral-200 px-3 py-2 text-left font-medium text-muted-foreground">
+                            <th className="sticky left-0 z-10 border-b border-neutral-200 bg-white px-3 py-2 text-left font-medium text-muted-foreground">
                                 メンバー
                             </th>
                             {poll.candidateDates.map((cd: any) => (
@@ -198,7 +202,7 @@ export default function PollDetailPage() {
                     <tbody>
                         {votes.map((vote: any) => (
                             <tr key={vote.uid} className="border-b border-neutral-100">
-                                <td className="px-3 py-2 font-medium">
+                                <td className="sticky left-0 z-10 bg-white px-3 py-2 font-medium">
                                     {vote.displayName}
                                     {vote.uid === user?.uid && (
                                         <span className="ml-1 text-[11px] text-muted-foreground">（自分）</span>
@@ -232,7 +236,7 @@ export default function PollDetailPage() {
                     {/* 集計行 */}
                     <tfoot>
                         <tr className="border-t-2 border-neutral-200 font-medium">
-                            <td className="px-3 py-2 text-muted-foreground">⭕️ 合計</td>
+                            <td className="sticky left-0 z-10 bg-white px-3 py-2 text-muted-foreground">⭕️ 合計</td>
                             {poll.candidateDates.map((cd: any) => (
                                 <td
                                     key={cd.id}
@@ -246,7 +250,7 @@ export default function PollDetailPage() {
                             ))}
                         </tr>
                         <tr className="font-medium">
-                            <td className="px-3 py-1 text-muted-foreground">🔺 合計</td>
+                            <td className="sticky left-0 z-10 bg-white px-3 py-1 text-muted-foreground">🔺 合計</td>
                             {poll.candidateDates.map((cd: any) => (
                                 <td
                                     key={cd.id}
@@ -267,32 +271,37 @@ export default function PollDetailPage() {
                         あなたの回答
                     </h2>
                     <p className="text-[12px] text-muted-foreground">
-                        各候補日をクリックして ⭕️ → 🔺 → ❌ を切り替えてください
+                        各候補日のアイコンを選択してください
                     </p>
                     <div className="flex flex-wrap gap-2">
-                        {poll.candidateDates.map((cd: any) => {
-                            const val = myResponses[cd.id];
-                            return (
-                                <button
-                                    key={cd.id}
-                                    onClick={() => toggleVote(cd.id)}
-                                    className={`flex flex-col items-center gap-1 rounded-md border px-4 py-3 transition-colors ${val
-                                        ? 'border-neutral-300 bg-neutral-50'
-                                        : 'border-dashed border-neutral-300'
-                                        }`}
-                                >
-                                    <span className="text-[12px] font-medium">
-                                        {format(new Date(cd.date), 'M/d(E)', { locale: ja })}
-                                    </span>
-                                    {cd.label && (
-                                        <span className="text-[11px] text-muted-foreground">{cd.label}</span>
-                                    )}
-                                    <span className="text-xl">
-                                        {val ? VOTE_LABELS[val] : '—'}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                        {poll.candidateDates.map((cd: any) => (
+                            <div
+                                key={cd.id}
+                                className="flex flex-col items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-3"
+                            >
+                                <span className="text-[12px] font-medium">
+                                    {format(new Date(cd.date), 'M/d(E)', { locale: ja })}
+                                </span>
+                                {cd.label && (
+                                    <span className="text-[11px] text-muted-foreground">{cd.label}</span>
+                                )}
+                                <div className="flex gap-1">
+                                    {(['ok', 'maybe', 'ng'] as VoteValue[]).map((v) => (
+                                        <button
+                                            key={v}
+                                            onClick={() => setVote(cd.id, v)}
+                                            className={`rounded px-2 py-1 text-base transition-colors ${
+                                                myResponses[cd.id] === v
+                                                    ? 'bg-foreground text-background'
+                                                    : 'hover:bg-neutral-100'
+                                            }`}
+                                        >
+                                            {VOTE_LABELS[v]}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                     <button
                         onClick={handleSubmitVote}
@@ -315,13 +324,41 @@ export default function PollDetailPage() {
             {/* 幹事: 締め切りボタン */}
             {isOrganizer && !isClosed && (
                 <button
-                    onClick={handleClose}
+                    onClick={() => setCloseDialogOpen(true)}
                     disabled={isClosing}
                     className="w-full rounded-md border border-neutral-200 px-4 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-neutral-50 disabled:opacity-50"
                 >
                     {isClosing ? '締め切り中...' : '🔒 アンケートを締め切る'}
                 </button>
             )}
+
+            {/* 締め切り確認ダイアログ */}
+            <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>アンケートを締め切る</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                        <p className="text-[13px] text-muted-foreground">
+                            アンケートを締め切りますか？締め切り後はメンバーが回答できなくなります。
+                        </p>
+                        <div className="flex gap-3 border-t pt-4">
+                            <button
+                                onClick={() => setCloseDialogOpen(false)}
+                                className="flex-1 rounded-md border border-neutral-200 px-4 py-2 text-[13px] font-medium transition-colors hover:bg-neutral-50"
+                            >
+                                キャンセル
+                            </button>
+                            <button
+                                onClick={handleClose}
+                                className="flex-1 rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-neutral-800"
+                            >
+                                締め切る
+                            </button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

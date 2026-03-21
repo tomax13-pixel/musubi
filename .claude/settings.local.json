@@ -12,7 +12,12 @@
       "Bash(npx shadcn@latest add:*)",
       "Bash(\"C:/Users/Tomax/OneDrive/musubi/components.json\" << 'EOF'\n{\n  \"$schema\": \"https://ui.shadcn.com/schema.json\",\n  \"style\": \"default\",\n  \"rsc\": true,\n  \"tsx\": true,\n  \"tailwind\": {\n    \"config\": \"\",\n    \"css\": \"app/globals.css\",\n    \"baseColor\": \"neutral\",\n    \"cssVariables\": true,\n    \"prefix\": \"\"\n  },\n  \"aliases\": {\n    \"components\": \"@/components\",\n    \"utils\": \"@/lib/utils/cn\",\n    \"ui\": \"@/components/ui\",\n    \"lib\": \"@/lib\",\n    \"hooks\": \"@/lib/hooks\"\n  },\n  \"iconLibrary\": \"lucide\"\n}\nEOF)",
       "Bash(find:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(find /c/Users/Tomax/OneDrive/musubi -maxdepth 2 -type f \\\\\\(-name *.md -o -name README* -o -name NOTES* \\\\\\))",
+      "Bash(npx next:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(ls \"C:/Users/Tomax/OneDrive/musubi/node_modules/.bin/next\"*)"
     ]
   }
 }

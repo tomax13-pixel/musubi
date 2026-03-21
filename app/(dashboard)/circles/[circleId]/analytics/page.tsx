@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'; // Icons
+import { ArrowLeft, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getCircleStatsAdmin, getUnpaidMembersAdmin, type CircleStats, type UnpaidMember } from '@/lib/actions/analytics.actions';
 import { getCurrentUserRoleAdmin } from '@/lib/actions/admin.actions';
@@ -103,7 +103,15 @@ export default function AnalyticsPage() {
 
             {/* Summary Cards */}
             {stats && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Users className="h-4 w-4" />
+                            <span className="text-xs font-medium">メンバー数</span>
+                        </div>
+                        <p className="text-2xl font-bold">{stats.memberCount}</p>
+                    </div>
+
                     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
                             <TrendingUp className="h-4 w-4" />
@@ -111,18 +119,33 @@ export default function AnalyticsPage() {
                         </div>
                         <p className="text-2xl font-bold">{Math.round((stats.averageAttendance / (stats.memberCount || 1)) * 100)}%</p>
                         <p className="text-[11px] text-muted-foreground md:mt-1">
-                            AVG: {stats.averageAttendance.toFixed(1)}人 / 全{stats.memberCount}人
+                            AVG: {stats.averageAttendance.toFixed(1)}人
                         </p>
                     </div>
 
                     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <Users className="h-4 w-4" />
+                            <TrendingUp className="h-4 w-4" />
                             <span className="text-xs font-medium">総イベント数</span>
                         </div>
                         <p className="text-2xl font-bold">{stats.totalEvents}</p>
                         <p className="text-[11px] text-muted-foreground md:mt-1">
-                            今後の予定: {stats.upcomingEvents}件
+                            今後: {stats.upcomingEvents}件
+                        </p>
+                    </div>
+
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                            <Wallet className="h-4 w-4" />
+                            <span className="text-xs font-medium">集金率</span>
+                        </div>
+                        <p className="text-2xl font-bold">
+                            {stats.totalPayments > 0
+                                ? Math.round((stats.confirmedPayments / stats.totalPayments) * 100)
+                                : 0}%
+                        </p>
+                        <p className="text-[11px] text-muted-foreground md:mt-1">
+                            {stats.confirmedPayments} / {stats.totalPayments}件
                         </p>
                     </div>
 
@@ -135,7 +158,7 @@ export default function AnalyticsPage() {
                             {formatCurrency(unpaidMembers.reduce((sum, m) => sum + m.totalUnpaid, 0))}
                         </p>
                         <p className="text-[11px] text-muted-foreground md:mt-1">
-                            対象人数: {unpaidMembers.length}人
+                            {unpaidMembers.length}人
                         </p>
                     </div>
                 </div>
@@ -201,7 +224,7 @@ export default function AnalyticsPage() {
                             {unpaidMembers.map((member) => (
                                 <div key={member.uid} className="bg-white">
                                     <div
-                                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50 transition-colors"
+                                        className="flex items-center justify-between border-l-2 border-l-transparent p-4 cursor-pointer transition-colors hover:bg-neutral-50 hover:border-l-neutral-400"
                                         onClick={() => setExpandedUser(expandedUser === member.uid ? null : member.uid)}
                                     >
                                         <div className="flex items-center gap-3">
@@ -244,23 +267,6 @@ export default function AnalyticsPage() {
                     </div>
                 )}
             </div>
-
-            {/* Attendance Chart (Placeholder for now, implementation plan mentioned it) */}
-            {/* Since I haven't implemented historical attendance data fetching yet in stats action detail-wise, 
-          I will stick to keeping it simple or omitting if data is missing. 
-          The plan said "Attendance Trend Graph". 
-          But `getCircleStatsAdmin` returns aggregate stats. 
-          To draw a trend line, I need daily/event-wise stats.
-          I'll skip the chart for this iteration to prioritize "Unpaid" as per user emphasis on "Analytics & Unpaid".
-          Wait, user request said "画面上部に...統計サマリー、下部に...未払い者リスト". 
-          Graph was mentioned in my plan ("Attendance Trend Graph").
-          If I want to do it, I need more data. 
-          For now, I'll stick to the Summary Cards and Unpaid List which are most critical and strictly requested.
-          I'll add a small note or maybe implement chart in next iteration if needed.
-          
-          Actually, let's just do it right. I'll add `recentAttendance` to `getCircleStatsAdmin` later if needed.
-          For now, the requested features are strictly Summary and Unpaid List.
-      */}
 
         </div>
     );

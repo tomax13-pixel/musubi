@@ -17,6 +17,8 @@ export interface CircleStats {
     averageAttendance: number;
     memberCount: number;
     monthlyStats: { name: string; attendance: number }[];
+    totalPayments: number;
+    confirmedPayments: number;
 }
 
 export interface UnpaidMember {
@@ -99,6 +101,13 @@ export async function getCircleStatsAdmin(circleId: string, currentUserUid: stri
 
     const averageAttendance = totalEvents > 0 ? (totalattendance / totalEvents) : 0;
 
+    // Payment stats
+    const paymentsSnap = await adminDb.collectionGroup('payments')
+        .where('circleId', '==', circleId).get();
+    const totalPayments = paymentsSnap.size;
+    const confirmedPayments = paymentsSnap.docs
+        .filter(d => d.data().status === 'confirmed').length;
+
     return serializeDoc({
         totalEvents,
         upcomingEvents,
@@ -106,6 +115,8 @@ export async function getCircleStatsAdmin(circleId: string, currentUserUid: stri
         averageAttendance: parseFloat(averageAttendance.toFixed(1)), // Round to 1 decimal
         memberCount,
         monthlyStats,
+        totalPayments,
+        confirmedPayments,
     });
 }
 
