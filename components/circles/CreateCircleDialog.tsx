@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { createCircle } from '@/lib/actions/circle.actions';
-import { EmojiPicker } from './EmojiPicker';
+import { CircleIconPicker } from './CircleIconPicker';
+import Image from 'next/image';
 
 interface Props {
   open: boolean;
@@ -24,7 +25,7 @@ export function CreateCircleDialog({ open, onClose }: Props) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [emoji, setEmoji] = useState('🎯');
+  const [emoji, setEmoji] = useState('/assets/circle-icons/sports.png');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,9 +61,22 @@ export function CreateCircleDialog({ open, onClose }: Props) {
           <DialogTitle>サークルを作成</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>アイコン</Label>
-            <EmojiPicker value={emoji} onChange={setEmoji} />
+          <div className="flex flex-col items-center gap-1.5 pt-2 pb-4">
+            <Label className="text-muted-foreground">アイコン</Label>
+            <CircleIconPicker value={emoji} onChange={setEmoji}>
+              <button
+                type="button"
+                className="relative flex h-[72px] w-[72px] items-center justify-center rounded-2xl border-2 border-dashed border-neutral-200 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+              >
+                <Image
+                  src={emoji}
+                  alt="サークルアイコン"
+                  fill
+                  className="object-contain p-[10px]"
+                  sizes="72px"
+                />
+              </button>
+            </CircleIconPicker>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="circle-name">サークル名 *</Label>

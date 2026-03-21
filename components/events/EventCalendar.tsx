@@ -17,7 +17,7 @@ interface EventCalendarProps {
 
 export function EventCalendar({ events, circleId }: EventCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
 
     // イベントを日付ごとにグループ化
     const eventsByDate = useMemo(() => {

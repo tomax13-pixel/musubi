@@ -5,6 +5,7 @@ import {
   type User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -34,8 +35,17 @@ export function useAuth(): AuthState & {
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<User> => {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      return result.user;
+    } catch (err: any) {
+      if (err?.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, googleProvider);
+        // signInWithRedirect navigates away; this won't resolve
+        return new Promise(() => {});
+      }
+      throw err;
+    }
   }, []);
 
   const signOut = useCallback(async (): Promise<void> => {

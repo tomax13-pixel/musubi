@@ -1,6 +1,8 @@
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { BottomNav } from '@/components/layout/BottomNav';
+import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Toaster } from '@/components/ui/sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -18,13 +20,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Header />
 
           {/* Page content */}
-          <main className="flex-1 overflow-y-auto px-6 py-8 md:px-10 md:py-10">
+          <main className="flex-1 overflow-y-auto px-6 py-8 pb-24 md:px-10 md:py-10 md:pb-10">
             <div className="mx-auto max-w-3xl">
+              <Breadcrumb />
               {children}
             </div>
           </main>
         </div>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <BottomNav />
+
       <Toaster />
     </AuthProvider>
   );

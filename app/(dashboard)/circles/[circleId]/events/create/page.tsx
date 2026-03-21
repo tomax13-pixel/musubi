@@ -19,7 +19,7 @@ export default function CreateEventPage() {
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [location, setLocation] = useState('');
-  const [fee, setFee] = useState('');
+  const [fee, setFee] = useState('0');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +35,7 @@ export default function CreateEventPage() {
           description: description.trim(),
           date: new Date(date).toISOString(),
           location: location.trim(),
-          fee: parseInt(fee, 10),
+          fee: parseInt(fee, 10) || 0,
         },
         user.uid
       );
@@ -97,9 +97,8 @@ export default function CreateEventPage() {
             type="number"
             value={fee}
             onChange={(e) => setFee(e.target.value)}
-            placeholder="例：1000"
+            placeholder="0（無料）"
             min="0"
-            required
             className="border-neutral-200 shadow-none focus-visible:ring-1 focus-visible:ring-neutral-300"
           />
         </div>
@@ -127,7 +126,7 @@ export default function CreateEventPage() {
           </button>
           <button
             type="submit"
-            disabled={submitting || !name.trim() || !date || !fee}
+            disabled={submitting || !name.trim() || !date}
             className="flex-1 rounded-md bg-foreground px-4 py-2 text-[13px] font-medium text-background transition-colors hover:bg-neutral-800 disabled:opacity-40"
           >
             {submitting ? '作成中...' : '作成する'}

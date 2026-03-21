@@ -1,13 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/components/auth/AuthProvider';
+import { CircleIcon } from '@/components/circles/CircleIcon';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { getCirclesForUser } from '@/lib/actions/circle.actions';
+import type { Circle } from '@/lib/types/models';
 
 const navItems = [
   { href: '/dashboard', label: 'ホーム', emoji: '🏠' },
@@ -18,6 +22,12 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const { user, signOut } = useAuthContext();
   const { permissionState, requestPermission } = useNotifications(user?.uid);
+  const [circles, setCircles] = useState<Circle[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    getCirclesForUser(user.uid).then(setCircles).catch(() => {});
+  }, [user]);
 
   return (
     <div className="flex h-full flex-col p-3">
@@ -35,7 +45,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 space-y-0.5">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto">
         {navItems.map(({ href, label, emoji }) => (
           <Link
             key={href}
@@ -52,6 +62,35 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             {label}
           </Link>
         ))}
+
+        {/* Circles list */}
+        {circles.length > 0 && (
+          <div className="mt-4 border-t pt-3">
+            <p className="mb-1 px-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              サークル
+            </p>
+            {circles.slice(0, 5).map((circle) => {
+              const circleHref = `/circles/${circle.id}`;
+              const isActive = pathname.startsWith(circleHref);
+              return (
+                <Link
+                  key={circle.id}
+                  href={circleHref}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-2 rounded px-2.5 py-1.5 text-[13px] transition-colors',
+                    isActive
+                      ? 'bg-neutral-100 font-medium text-foreground'
+                      : 'text-muted-foreground hover:bg-neutral-50 hover:text-foreground'
+                  )}
+                >
+                  <CircleIcon emoji={circle.emoji} size={18} />
+                  <span className="truncate">{circle.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* User info + sign out */}
