@@ -76,6 +76,15 @@ export interface AttendanceRecord {
   photoURL?: string | null;
 }
 
+/** 支払い明細の1行（ドリンク等） */
+export interface PaymentLineItem {
+  id: string;
+  name: string;
+  price: number;
+  addedBy: string;
+  addedAt: string;
+}
+
 /** circles/{circleId}/events/{eventId}/payments/{uid|guestId} */
 export interface PaymentRecord {
   id: string;
@@ -85,6 +94,8 @@ export interface PaymentRecord {
   uid?: string;
   guestId?: string;
   amount: number;
+  baseFee: number;
+  items: PaymentLineItem[];
   status: PaymentStatus;
   markedPaidAt: Timestamp | null;
   markedPaidBy?: string;

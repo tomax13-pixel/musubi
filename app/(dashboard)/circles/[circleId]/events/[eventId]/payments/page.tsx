@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Bell, Check, RotateCcw } from 'lucide-react';
+import { Bell, Check, ChevronDown, RotateCcw } from 'lucide-react';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getCurrentUserRoleAdmin, getPaymentsForEventAdmin, markAsPaidAdmin, confirmPaymentAdmin, resetPaymentAdmin, getEventAdmin } from '@/lib/actions/admin.actions';
 import { PaymentStatusBadge } from '@/components/payments/PaymentStatusBadge';
+import { PaymentItemList } from '@/components/payments/PaymentItemList';
 import type { PaymentRecord, Event } from '@/lib/types/models';
 import { formatAmount } from '@/lib/utils/date';
 import { showGamificationToast } from '@/components/gamification/GamificationToast';
@@ -22,6 +23,7 @@ export default function PaymentsPage() {
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -114,6 +116,10 @@ export default function PaymentsPage() {
     }
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  };
+
   if (loading) {
     return <div className="space-y-2">
       {[1, 2, 3].map((i) => <div key={i} className="h-14 animate-pulse rounded bg-neutral-50" />)}
@@ -157,82 +163,119 @@ export default function PaymentsPage() {
         </div>
       ) : (
         <div className="divide-y border-y">
-          {payments.map((payment) => (
-            <div key={payment.id} className="flex items-center gap-3 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{payment.displayName}</span>
-                  {payment.isGuest && (
-                    <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">ゲスト</span>
-                  )}
+          {payments.map((payment) => {
+            const isExpanded = expandedId === payment.id;
+            const drinksTotal = (payment.items ?? []).reduce((s, i) => s + i.price, 0);
+            const canEdit = isOrganizer || (!!user && user.uid === payment.uid);
+
+            return (
+              <div key={payment.id} className="py-3">
+                <div
+                  className="flex cursor-pointer items-center gap-3"
+                  onClick={() => toggleExpand(payment.id)}
+                >
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition-transform ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                    strokeWidth={1.5}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{payment.displayName}</span>
+                      {payment.isGuest && (
+                        <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">ゲスト</span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-muted-foreground tabular-nums">
+                      {drinksTotal > 0
+                        ? `${formatAmount(payment.baseFee)} + ドリンク ${formatAmount(drinksTotal)} = ${formatAmount(payment.amount)}`
+                        : formatAmount(payment.amount)
+                      }
+                    </p>
+                  </div>
+
+                  <PaymentStatusBadge status={payment.status} />
+
+                  {/* Actions */}
+                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {!isOrganizer && user?.uid === payment.uid && payment.status === 'unpaid' && (
+                      <button
+                        disabled={actionLoading === payment.id}
+                        onClick={() => handleMarkAsPaid(payment.id)}
+                        className="rounded-md border border-neutral-200 px-2.5 py-1 text-[12px] font-medium transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                      >
+                        支払済みにする
+                      </button>
+                    )}
+
+                    {isOrganizer && (
+                      <>
+                        {payment.status === 'pending_confirmation' && (
+                          <button
+                            disabled={actionLoading === payment.id}
+                            onClick={() => handleConfirm(payment.id)}
+                            className="flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[12px] font-medium text-background transition-colors hover:bg-neutral-800 disabled:opacity-40"
+                          >
+                            <Check className="h-3 w-3" strokeWidth={1.5} />
+                            確認
+                          </button>
+                        )}
+
+                        {payment.status === 'unpaid' && (
+                          <button
+                            disabled={actionLoading === payment.id}
+                            onClick={() => handleConfirm(payment.id)}
+                            className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1 text-[12px] font-medium transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                          >
+                            <Check className="h-3 w-3" strokeWidth={1.5} />
+                            受領
+                          </button>
+                        )}
+
+                        {payment.status === 'confirmed' && (
+                          <button
+                            disabled={actionLoading === payment.id}
+                            onClick={() => handleReset(payment.id)}
+                            title="未払いにリセット"
+                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground disabled:opacity-40"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          </button>
+                        )}
+
+                        {payment.status !== 'confirmed' && !payment.isGuest && payment.uid && (
+                          <button
+                            disabled={actionLoading === `remind-${payment.id}`}
+                            onClick={() => handleSendReminder(payment)}
+                            title="リマインダーを送信"
+                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground disabled:opacity-40"
+                          >
+                            <Bell className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[12px] text-muted-foreground tabular-nums">{formatAmount(payment.amount)}</p>
-              </div>
 
-              <PaymentStatusBadge status={payment.status} />
-
-              {/* Actions */}
-              <div className="flex gap-1 shrink-0">
-                {!isOrganizer && user?.uid === payment.uid && payment.status === 'unpaid' && (
-                  <button
-                    disabled={actionLoading === payment.id}
-                    onClick={() => handleMarkAsPaid(payment.id)}
-                    className="rounded-md border border-neutral-200 px-2.5 py-1 text-[12px] font-medium transition-colors hover:bg-neutral-50 disabled:opacity-40"
-                  >
-                    支払済みにする
-                  </button>
-                )}
-
-                {isOrganizer && (
-                  <>
-                    {payment.status === 'pending_confirmation' && (
-                      <button
-                        disabled={actionLoading === payment.id}
-                        onClick={() => handleConfirm(payment.id)}
-                        className="flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[12px] font-medium text-background transition-colors hover:bg-neutral-800 disabled:opacity-40"
-                      >
-                        <Check className="h-3 w-3" strokeWidth={1.5} />
-                        確認
-                      </button>
-                    )}
-
-                    {payment.status === 'unpaid' && (
-                      <button
-                        disabled={actionLoading === payment.id}
-                        onClick={() => handleConfirm(payment.id)}
-                        className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1 text-[12px] font-medium transition-colors hover:bg-neutral-50 disabled:opacity-40"
-                      >
-                        <Check className="h-3 w-3" strokeWidth={1.5} />
-                        受領
-                      </button>
-                    )}
-
-                    {payment.status === 'confirmed' && (
-                      <button
-                        disabled={actionLoading === payment.id}
-                        onClick={() => handleReset(payment.id)}
-                        title="未払いにリセット"
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground disabled:opacity-40"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </button>
-                    )}
-
-                    {payment.status !== 'confirmed' && !payment.isGuest && payment.uid && (
-                      <button
-                        disabled={actionLoading === `remind-${payment.id}`}
-                        onClick={() => handleSendReminder(payment)}
-                        title="リマインダーを送信"
-                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground disabled:opacity-40"
-                      >
-                        <Bell className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </button>
-                    )}
-                  </>
+                {/* Expandable item list */}
+                {isExpanded && user && (
+                  <div className="ml-7 mt-2">
+                    <PaymentItemList
+                      circleId={circleId}
+                      eventId={eventId}
+                      paymentId={payment.id}
+                      baseFee={payment.baseFee ?? payment.amount}
+                      items={payment.items ?? []}
+                      canEdit={canEdit}
+                      isOrganizer={isOrganizer}
+                      currentUserUid={user.uid}
+                      onItemsChanged={loadData}
+                    />
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

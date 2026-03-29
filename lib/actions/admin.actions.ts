@@ -468,6 +468,8 @@ export async function recordAttendanceAdmin(
                 circleId,
                 isGuest: attendee.isGuest,
                 amount: fee,
+                baseFee: fee,
+                items: [],
                 status: 'unpaid',
                 markedPaidAt: null,
                 confirmedAt: null,
@@ -476,30 +478,14 @@ export async function recordAttendanceAdmin(
                 displayName: attendee.displayName,
             };
 
-            // Only set uid or guestId, not both (avoid undefined)
             if (attendee.isGuest && attendee.guestId) {
                 paymentData.guestId = attendee.guestId;
             } else if (!attendee.isGuest && attendee.uid) {
                 paymentData.uid = attendee.uid;
             }
 
-            // Only set email if it exists
             if (attendee.email) paymentData.email = attendee.email;
 
-            // Use merge so re-recording attendance doesn't overwrite confirmed payments
-            // Note: Admin SDK batch set with merge: false is default for set() unless merge is specified
-            // to update without overwrite, use update() or set() with merge: true? 
-            // Original code used set({ ... }, { merge: false }) to overwrite completely BUT 
-            // wait, original comment says "Use merge so re-recording attendance doesn't overwrite confirmed payments"
-            // BUT code says `{ merge: false }`. This implies it DOES overwrite. 
-            // Let's verify original code logic.
-            // Original: `batch.set(paymentRef, paymentData as Omit<PaymentRecord, 'id'>, { merge: false });`
-            // If the user INTENDED to not overwrite confirmed payments, this logic might be buggy or I misunderstand `merge: false`.
-            // `merge: false` (default) means REPLACE the document.
-            // If we want to preserve existing payment status (e.g. 'paid'), we should probably check existence or use merge.
-            // However, to keep faithful translation of EXACTLY what the client code was doing (even if buggy), 
-            // I should use `set`. 
-            // Let's assume the user wants to RESET payment status on re-attendance for now to match client behavior.
             batch.set(paymentRef, paymentData);
         }
     }
@@ -598,6 +584,8 @@ export async function qrCheckInAdmin(
         isGuest: false,
         uid: memberUid,
         amount: fee,
+        baseFee: fee,
+        items: [],
         status: 'unpaid',
         markedPaidAt: null,
         confirmedAt: null,
@@ -646,6 +634,8 @@ export async function getPaymentsForEventAdmin(circleId: string, eventId: string
             guestId: data.guestId ?? null,
             isGuest: data.isGuest,
             amount: data.amount,
+            baseFee: data.baseFee ?? data.amount ?? 0,
+            items: data.items ?? [],
             status: data.status,
             displayName: data.displayName,
             email: data.email ?? null,
@@ -915,6 +905,8 @@ export async function respondAttendanceAdmin(
                     isGuest: false,
                     uid,
                     amount: fee,
+                    baseFee: fee,
+                    items: [],
                     status: 'unpaid',
                     markedPaidAt: null,
                     confirmedAt: null,
@@ -1011,4 +1003,105 @@ export async function leaveCircleAdmin(circleId: string, uid: string) {
 
     revalidatePath(`/circles/${circleId}`);
     revalidatePath('/dashboard');
+}
+
+// =====================
+// Payment Line Items (明細管理)
+// =====================
+
+/** メンバーの支払いにドリンク等の明細を追加 */
+export async function addPaymentItemAdmin(
+    circleId: string,
+    eventId: string,
+    paymentId: string,
+    item: { name: string; price: number },
+    currentUserUid: string
+) {
+    const name = item.name.trim();
+    if (!name || name.length > 50) throw new Error('ドリンク名は1〜50文字で入力してください');
+    if (!Number.isInteger(item.price) || item.price <= 0) throw new Error('金額は1円以上の整数で入力してください');
+
+    // 権限チェック: 本人 or 幹事
+    const role = await getCurrentUserRoleAdmin(circleId, currentUserUid);
+    if (!role) throw new Error('サークルメンバーではありません');
+    const isSelf = paymentId === currentUserUid;
+    if (!isSelf && role !== 'organizer') throw new Error('他のメンバーの明細は幹事のみ追加できます');
+
+    const paymentRef = adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments').doc(paymentId);
+
+    await adminDb.runTransaction(async (tx) => {
+        const doc = await tx.get(paymentRef);
+        if (!doc.exists) throw new Error('支払い記録が見つかりません');
+
+        const data = doc.data()!;
+        const items = data.items ?? [];
+        if (items.length >= 20) throw new Error('明細は20件までです');
+
+        const baseFee = data.baseFee ?? data.amount ?? 0;
+        const newItem = {
+            id: crypto.randomUUID(),
+            name,
+            price: item.price,
+            addedBy: currentUserUid,
+            addedAt: new Date().toISOString(),
+        };
+        const updatedItems = [...items, newItem];
+        const newAmount = baseFee + updatedItems.reduce((s: number, i: any) => s + i.price, 0);
+
+        tx.update(paymentRef, {
+            items: updatedItems,
+            baseFee,
+            amount: newAmount,
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+    });
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
+}
+
+/** メンバーの支払いから明細を削除 */
+export async function removePaymentItemAdmin(
+    circleId: string,
+    eventId: string,
+    paymentId: string,
+    itemId: string,
+    currentUserUid: string
+) {
+    const role = await getCurrentUserRoleAdmin(circleId, currentUserUid);
+    if (!role) throw new Error('サークルメンバーではありません');
+
+    const paymentRef = adminDb
+        .collection('circles').doc(circleId)
+        .collection('events').doc(eventId)
+        .collection('payments').doc(paymentId);
+
+    await adminDb.runTransaction(async (tx) => {
+        const doc = await tx.get(paymentRef);
+        if (!doc.exists) throw new Error('支払い記録が見つかりません');
+
+        const data = doc.data()!;
+        const items = data.items ?? [];
+        const targetItem = items.find((i: any) => i.id === itemId);
+        if (!targetItem) throw new Error('明細が見つかりません');
+
+        // 権限: 自分が追加した項目 or 幹事
+        if (targetItem.addedBy !== currentUserUid && role !== 'organizer') {
+            throw new Error('この明細を削除する権限がありません');
+        }
+
+        const baseFee = data.baseFee ?? data.amount ?? 0;
+        const updatedItems = items.filter((i: any) => i.id !== itemId);
+        const newAmount = baseFee + updatedItems.reduce((s: number, i: any) => s + i.price, 0);
+
+        tx.update(paymentRef, {
+            items: updatedItems,
+            amount: newAmount,
+            updatedAt: FieldValue.serverTimestamp(),
+        });
+    });
+
+    revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
 }
