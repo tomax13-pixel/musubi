@@ -9,6 +9,7 @@ import { getCurrentUserRoleAdmin, getPaymentsForEventAdmin, markAsPaidAdmin, con
 import { PaymentStatusBadge } from '@/components/payments/PaymentStatusBadge';
 import type { PaymentRecord, Event } from '@/lib/types/models';
 import { formatAmount } from '@/lib/utils/date';
+import { showGamificationToast } from '@/components/gamification/GamificationToast';
 
 export default function PaymentsPage() {
   const params = useParams();
@@ -58,8 +59,11 @@ export default function PaymentsPage() {
     if (!user) return;
     setActionLoading(paymentId);
     try {
-      await confirmPaymentAdmin(circleId, eventId, paymentId, user.uid);
+      const confirmResult = await confirmPaymentAdmin(circleId, eventId, paymentId, user.uid);
       toast.success('支払いを確認しました');
+      if (confirmResult?.gamification) {
+        showGamificationToast(confirmResult.gamification);
+      }
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'エラーが発生しました');

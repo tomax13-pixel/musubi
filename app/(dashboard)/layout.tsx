@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Breadcrumb } from '@/components/layout/Breadcrumb';
 import { Toaster } from '@/components/ui/sonner';
+import { PageTransition } from '@/components/layout/PageTransition';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -23,7 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <main className="flex-1 overflow-y-auto px-6 py-8 pb-24 md:px-10 md:py-10 md:pb-10">
             <div className="mx-auto max-w-3xl">
               <Breadcrumb />
-              {children}
+              <PageTransition>{children}</PageTransition>
             </div>
           </main>
         </div>

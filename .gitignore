@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp/debug output files
+.build_output*.txt
+.git_diff_stat.txt
+.git_log_out*.txt
+.git_status_out*.txt
+git_status.txt

@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Plus, LogOut, Settings, MoreHorizontal } from 'lucide-react';
+import { Plus, LogOut, Settings, MoreHorizontal, Users, Calendar, Vote } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { CircleIcon } from '@/components/circles/CircleIcon';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/components/auth/AuthProvider';
@@ -19,6 +20,7 @@ import type { Circle, Event } from '@/lib/types/models';
 import { formatDate, formatAmount } from '@/lib/utils/date';
 import { InviteLinkButton } from '@/components/circles/InviteLinkButton';
 import { EventCalendar } from '@/components/events/EventCalendar';
+import { CircleLeaderboard } from '@/components/gamification/CircleLeaderboard';
 import {
   Dialog,
   DialogContent,
@@ -126,12 +128,27 @@ export default function CircleDetailPage() {
 
   if (!circle) return <p className="text-muted-foreground">サークルが見つかりません</p>;
 
+  const stagger = (i: number) => ({
+    initial: { opacity: 0, y: 12 } as const,
+    animate: { opacity: 1, y: 0 } as const,
+    transition: { delay: i * 0.06, duration: 0.3, ease: 'easeOut' as const },
+  });
+
+  const memberCount = 0; // filled by getCircleMembersAdmin
+  const upcomingCount = events.filter(e => {
+    const d = (e.date as any)?.toDate?.() ?? new Date(e.date as any);
+    return d > new Date();
+  }).length;
+  const openPollCount = polls.filter(p => p.status === 'open').length;
+
   return (
     <div className="space-y-8">
       {/* Circle header */}
-      <div className="flex items-start justify-between gap-4">
+      <motion.div {...stagger(0)} className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <CircleIcon emoji={circle.emoji} size={48} />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-50">
+            <CircleIcon emoji={circle.emoji} size={40} />
+          </div>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{circle.name}</h1>
             {circle.description && (
@@ -168,10 +185,28 @@ export default function CircleDetailPage() {
             </DropdownMenu>
           </div>
         )}
-      </div>
+      </motion.div>
+
+      {/* Quick stats */}
+      <motion.div {...stagger(1)} className="flex gap-3">
+        <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-[12px] text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          {upcomingCount > 0 ? `${upcomingCount}件の予定` : '予定なし'}
+        </div>
+        {openPollCount > 0 && (
+          <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-[12px] text-muted-foreground">
+            <Vote className="h-3 w-3" />
+            {openPollCount}件の調整中
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-[12px] text-muted-foreground">
+          <Users className="h-3 w-3" />
+          全{events.length}イベント
+        </div>
+      </motion.div>
 
       {/* Events section - Calendar */}
-      <div>
+      <motion.div {...stagger(2)}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
             📅 イベント
@@ -208,10 +243,10 @@ export default function CircleDetailPage() {
         ) : (
           <EventCalendar events={events} circleId={circleId} />
         )}
-      </div>
+      </motion.div>
 
       {/* Polls section */}
-      <div>
+      <motion.div {...stagger(3)}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
             🗳️ 日程調整
@@ -246,12 +281,12 @@ export default function CircleDetailPage() {
             )}
           </div>
         ) : (
-          <div className="divide-y border-t">
+          <div className="space-y-2">
             {polls.map((poll) => (
               <Link
                 key={poll.id}
                 href={`/circles/${circleId}/polls/${poll.id}`}
-                className="flex items-center gap-4 py-3 transition-colors hover:bg-neutral-50"
+                className="flex items-center gap-4 rounded-lg border border-neutral-200 bg-white px-4 py-3 transition-all hover:border-neutral-300 hover:shadow-sm active:scale-[0.99]"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -277,7 +312,14 @@ export default function CircleDetailPage() {
             ))}
           </div>
         )}
-      </div>
+      </motion.div>
+
+      {/* Leaderboard */}
+      {user && (
+        <motion.div {...stagger(4)}>
+          <CircleLeaderboard circleId={circleId} currentUid={user.uid} />
+        </motion.div>
+      )}
 
       {/* Leave circle */}
       <div className="border-t pt-6">

@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/utils/date';
 import { ArrowLeft, Camera, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { showGamificationToast } from '@/components/gamification/GamificationToast';
 
 type ScanResult = {
     displayName: string;
@@ -90,6 +91,7 @@ export default function QRCheckInPage() {
                 });
                 setCheckedInCount(prev => prev + 1);
                 toast.success(`${result.displayName} さんのチェックイン完了！`);
+                showGamificationToast(result.gamification);
             } else {
                 setLastResult({
                     displayName: result.displayName,

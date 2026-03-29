@@ -25,19 +25,24 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-colors',
+                'relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] transition-all active:scale-90',
                 isActive
                   ? 'text-foreground'
                   : 'text-muted-foreground'
               )}
             >
-              <Icon
-                className={cn('h-5 w-5', isActive && 'stroke-[2.5]')}
-                strokeWidth={isActive ? 2.5 : 1.5}
-              />
+              <div className="relative">
+                <Icon
+                  className={cn('h-5 w-5', isActive && 'stroke-[2.5]')}
+                  strokeWidth={isActive ? 2.5 : 1.5}
+                />
+              </div>
               <span className={cn('leading-none', isActive && 'font-semibold')}>
                 {label}
               </span>
+              {isActive && (
+                <div className="absolute -bottom-0 h-0.5 w-6 rounded-full bg-foreground" />
+              )}
             </Link>
           );
         })}

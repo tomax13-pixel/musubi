@@ -13,6 +13,7 @@ import { updateEventAdmin, deleteEventAdmin, respondAttendanceAdmin, getMyAttend
 import type { Event, PaymentRecord } from '@/lib/types/models';
 import { formatDate, formatAmount } from '@/lib/utils/date';
 import { PAYMENT_STATUS_CONFIG } from '@/lib/constants/paymentStatus';
+import { showGamificationToast } from '@/components/gamification/GamificationToast';
 import { SendNotificationPanel } from '@/components/notifications/SendNotificationPanel';
 import {
   Dialog,
@@ -138,7 +139,7 @@ export default function EventDetailPage() {
     if (!user) return;
     setRespondingAttendance(true);
     try {
-      await respondAttendanceAdmin(
+      const result = await respondAttendanceAdmin(
         circleId,
         eventId,
         user.uid,
@@ -149,6 +150,9 @@ export default function EventDetailPage() {
       );
       setMyAttendance(response === 'attend');
       toast.success(response === 'attend' ? '参加で回答しました' : '不参加で回答しました');
+      if (response === 'attend' && result?.gamification) {
+        showGamificationToast(result.gamification);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '回答に失敗しました');
     } finally {

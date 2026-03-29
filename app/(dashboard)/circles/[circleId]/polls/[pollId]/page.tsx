@@ -8,6 +8,7 @@ import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getPollWithVotes, submitPollVoteAdmin, closePollAdmin } from '@/lib/actions/poll.actions';
 import { getCurrentUserRole } from '@/lib/actions/circle.actions';
 import { toast } from 'sonner';
+import { showGamificationToast } from '@/components/gamification/GamificationToast';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import {
@@ -106,8 +107,11 @@ export default function PollDetailPage() {
 
         setIsSubmitting(true);
         try {
-            await submitPollVoteAdmin(circleId, pollId, user.uid, myResponses);
+            const voteResult = await submitPollVoteAdmin(circleId, pollId, user.uid, myResponses);
             toast.success('回答を送信しました');
+            if (voteResult?.gamification) {
+                showGamificationToast(voteResult.gamification);
+            }
             // リロードして集計を更新
             const updated = await getPollWithVotes(circleId, pollId);
             setData(updated);

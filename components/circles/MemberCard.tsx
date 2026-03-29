@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CircleMember } from '@/lib/types/models';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ import {
 } from '@/lib/actions/admin.actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { getTopBadges } from '@/lib/actions/gamification.actions';
 
 interface MemberCardProps {
     circleId: string;
@@ -36,6 +37,11 @@ export function MemberCard({ circleId, member, currentUserUid, currentUserRole }
     const isSelf = member.uid === currentUserUid;
     const isOrganizer = member.role === 'organizer';
     const canManage = currentUserRole === 'organizer' && !isSelf;
+    const [topBadges, setTopBadges] = useState<{ badgeId: string; emoji: string; name: string }[]>([]);
+
+    useEffect(() => {
+        getTopBadges(member.uid, 3).then(setTopBadges).catch(() => {});
+    }, [member.uid]);
 
     const handlePromote = async () => {
         if (!confirm(`${member.displayName} を幹事に昇格させますか？`)) return;
@@ -103,7 +109,14 @@ export function MemberCard({ circleId, member, currentUserUid, currentUserRole }
                             </Badge>
                         )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{member.email}</p>
+                    <div className="flex items-center gap-1">
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                        {topBadges.length > 0 && (
+                            <span className="ml-1 text-[12px]" title={topBadges.map(b => b.name).join(', ')}>
+                                {topBadges.map(b => b.emoji).join('')}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 

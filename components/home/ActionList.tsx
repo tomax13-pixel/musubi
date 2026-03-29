@@ -1,21 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { CircleCheck, Banknote, Vote } from 'lucide-react';
+import { CircleCheck, Banknote, Vote, Clock } from 'lucide-react';
 import { CircleIcon } from '@/components/circles/CircleIcon';
 import { motion } from 'framer-motion';
-
-interface ActionItem {
-  type: 'attendance' | 'payment' | 'poll';
-  circleId: string;
-  circleName: string;
-  circleEmoji: string;
-  eventId?: string;
-  pollId?: string;
-  title: string;
-  subtitle: string;
-  date?: string;
-}
+import type { ActionItem } from '@/lib/actions/dashboard.actions';
+import { EarlyBirdCountdown } from '@/components/gamification/EarlyBirdCountdown';
 
 const typeConfig = {
   attendance: {
@@ -36,6 +26,12 @@ const typeConfig = {
     color: 'text-violet-600',
     bgColor: 'bg-violet-50',
   },
+};
+
+const priorityBorder = {
+  high: 'border-l-red-400',
+  medium: 'border-l-amber-400',
+  low: 'border-l-neutral-200',
 };
 
 function getActionHref(action: ActionItem): string {
@@ -77,7 +73,7 @@ export function ActionList({ actions }: { actions: ActionItem[] }) {
           >
             <Link
               href={href}
-              className="flex items-center gap-3 rounded-lg border border-neutral-100 bg-white px-3.5 py-3 transition-all hover:border-neutral-200 hover:shadow-sm active:scale-[0.99]"
+              className={`flex items-center gap-3 rounded-lg border border-neutral-100 border-l-[3px] ${priorityBorder[action.priority]} bg-white px-3.5 py-3 transition-all hover:border-neutral-200 hover:shadow-sm active:scale-[0.99]`}
             >
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${config.bgColor}`}>
                 <Icon className={`h-4 w-4 ${config.color}`} strokeWidth={1.8} />
@@ -89,9 +85,20 @@ export function ActionList({ actions }: { actions: ActionItem[] }) {
                   <span className="truncate">{action.circleName} · {action.subtitle}</span>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.bgColor} ${config.color}`}>
-                {config.label}
-              </span>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${config.bgColor} ${config.color}`}>
+                  {config.label}
+                </span>
+                {action.type === 'attendance' && action.date && (
+                  <EarlyBirdCountdown eventDate={action.date} />
+                )}
+                {action.dueLabel && (
+                  <span className={`flex items-center gap-0.5 text-[10px] ${action.priority === 'high' ? 'font-medium text-red-500' : 'text-neutral-400'}`}>
+                    <Clock className="h-2.5 w-2.5" />
+                    {action.dueLabel}
+                  </span>
+                )}
+              </div>
             </Link>
           </motion.div>
         );
