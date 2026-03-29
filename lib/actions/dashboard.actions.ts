@@ -6,7 +6,7 @@ import { adminDb } from '@/lib/firebase/adminApp';
  * ホーム画面用: ユーザーの全サークル横断で「やるべきこと」と「直近イベント」を取得
  */
 
-interface ActionItem {
+export interface ActionItem {
   type: 'attendance' | 'payment' | 'poll';
   circleId: string;
   circleName: string;
@@ -16,6 +16,8 @@ interface ActionItem {
   title: string;
   subtitle: string;
   date?: string;
+  priority: 'high' | 'medium' | 'low';
+  dueLabel?: string; // "あと2日" など
 }
 
 interface UpcomingEvent {
@@ -43,10 +45,19 @@ export interface CircleDetail {
   } | null;
 }
 
+export interface StreakDanger {
+  currentStreak: number;
+  nextEventName: string;
+  nextEventDate: string;
+  circleId: string;
+  eventId: string;
+}
+
 export async function getDashboardData(uid: string): Promise<{
   actions: ActionItem[];
   upcomingEvents: UpcomingEvent[];
   circleDetails: CircleDetail[];
+  streakDanger: StreakDanger | null;
 }> {
   // 1. ユーザーが所属する全サークルを取得
   const memberSnaps = await adminDb
@@ -61,7 +72,7 @@ export async function getDashboardData(uid: string): Promise<{
   });
 
   if (circleIds.length === 0) {
-    return { actions: [], upcomingEvents: [], circleDetails: [] };
+    return { actions: [], upcomingEvents: [], circleDetails: [], streakDanger: null };
   }
 
   // 2. 各サークルの情報を取得
@@ -143,6 +154,7 @@ export async function getDashboardData(uid: string): Promise<{
 
         // 未回答の出欠はアクションに追加
         if (myAttendance === null) {
+          const { priority, dueLabel } = calcPriority(eventDate, now);
           actions.push({
             type: 'attendance',
             circleId,
@@ -152,6 +164,8 @@ export async function getDashboardData(uid: string): Promise<{
             title: `${event.name} の出欠`,
             subtitle: `${formatSimpleDate(eventDate)}`,
             date: eventDate.toISOString(),
+            priority,
+            dueLabel,
           });
         }
       }
@@ -164,6 +178,8 @@ export async function getDashboardData(uid: string): Promise<{
       if (payDoc.exists) {
         const pay = payDoc.data()!;
         if (pay.status === 'unpaid') {
+          // 支払いは常にhigh優先度（未払いは早く解消すべき）
+          const { dueLabel } = calcPriority(eventDate, now);
           actions.push({
             type: 'payment',
             circleId,
@@ -173,6 +189,8 @@ export async function getDashboardData(uid: string): Promise<{
             title: `${event.name} の参加費`,
             subtitle: `¥${(pay.amount || 0).toLocaleString()}`,
             date: eventDate.toISOString(),
+            priority: 'high',
+            dueLabel,
           });
         }
       }
@@ -191,6 +209,9 @@ export async function getDashboardData(uid: string): Promise<{
         .get();
 
       if (!voteDoc.exists) {
+        // 投票の締切日があれば使用、なければmedium
+        const pollDeadline = poll.deadline?.toDate?.() ?? null;
+        const pollPriority = calcPriority(pollDeadline, now);
         actions.push({
           type: 'poll',
           circleId,
@@ -199,6 +220,8 @@ export async function getDashboardData(uid: string): Promise<{
           pollId: pollDoc.id,
           title: `${poll.title}`,
           subtitle: `${poll.candidateDates?.length || 0}つの候補日`,
+          priority: pollDeadline ? pollPriority.priority : 'medium',
+          dueLabel: pollPriority.dueLabel,
         });
       }
     }
@@ -216,14 +239,41 @@ export async function getDashboardData(uid: string): Promise<{
   // イベントを日付順にソート（直近が先）
   upcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // アクションを種類順にソート：出欠 → 支払い → 日程調整
+  // アクションを優先度順にソート（high → medium → low）、同じ優先度なら種類順
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
   const typePriority = { attendance: 0, payment: 1, poll: 2 };
-  actions.sort((a, b) => typePriority[a.type] - typePriority[b.type]);
+  actions.sort((a, b) => {
+    const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (pDiff !== 0) return pDiff;
+    return typePriority[a.type] - typePriority[b.type];
+  });
+
+  // ストリーク喪失警告の検出
+  let streakDanger: StreakDanger | null = null;
+  try {
+    const gamStatsDoc = await adminDb.collection('users').doc(uid).collection('gamification').doc('stats').get();
+    const currentStreak = gamStatsDoc.exists ? (gamStatsDoc.data()?.currentStreak ?? 0) : 0;
+
+    if (currentStreak >= 3) {
+      // 次の未回答イベントがあるかチェック
+      const unansweredAttendance = actions.find(a => a.type === 'attendance');
+      if (unansweredAttendance && unansweredAttendance.eventId) {
+        streakDanger = {
+          currentStreak,
+          nextEventName: unansweredAttendance.title.replace(' の出欠', ''),
+          nextEventDate: unansweredAttendance.date ?? '',
+          circleId: unansweredAttendance.circleId,
+          eventId: unansweredAttendance.eventId,
+        };
+      }
+    }
+  } catch { /* ストリーク情報取得失敗は無視 */ }
 
   return {
     actions: actions.slice(0, 10),
     upcomingEvents: upcomingEvents.slice(0, 10),
     circleDetails,
+    streakDanger,
   };
 }
 
@@ -233,4 +283,18 @@ function formatSimpleDate(date: Date): string {
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
   const day = dayNames[date.getDay()];
   return `${m}/${d}(${day})`;
+}
+
+/**
+ * 期限までの日数から優先度とラベルを算出
+ */
+function calcPriority(eventDate: Date | null, now: Date): { priority: ActionItem['priority']; dueLabel?: string } {
+  if (!eventDate) return { priority: 'low' };
+  const diffMs = eventDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) return { priority: 'high', dueLabel: '今日' };
+  if (diffDays <= 3) return { priority: 'high', dueLabel: `あと${diffDays}日` };
+  if (diffDays <= 7) return { priority: 'medium', dueLabel: `あと${diffDays}日` };
+  return { priority: 'low', dueLabel: `あと${diffDays}日` };
 }

@@ -4,6 +4,9 @@ import { adminDb } from '@/lib/firebase/adminApp';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { serializeDoc } from '@/lib/utils/serialize';
+import { awardPointsWithResult, recalculateStreak, updateCircleLeaderboard } from '@/lib/actions/gamification.actions';
+import type { GamificationResult } from '@/lib/types/gamification';
+import { EMPTY_GAMIFICATION_RESULT, mergeGamificationResults } from '@/lib/types/gamification';
 
 // Helper to check if user is organizer in a circle
 export async function getCurrentUserRoleAdmin(circleId: string, uid: string): Promise<'organizer' | 'member' | null> {
@@ -502,6 +505,18 @@ export async function recordAttendanceAdmin(
     }
 
     await batch.commit();
+
+    // ゲーミフィケーション: 出席した非ゲストメンバーにポイント付与
+    for (const attendee of attendees) {
+        if (!attendee.isGuest && attendee.attended && attendee.uid) {
+            try {
+                const result = await awardPointsWithResult(attendee.uid, 'attendance', 10);
+                await updateCircleLeaderboard(circleId, attendee.uid, result.pointsAwarded[0]?.points ?? 10);
+                await recalculateStreak(attendee.uid);
+            } catch (e) { /* ポイント付与失敗は無視 */ }
+        }
+    }
+    // 一括記録は幹事操作のため、個別メンバーのGamificationResultはクライアントに返さない
 }
 
 export async function qrCheckInAdmin(
@@ -594,7 +609,20 @@ export async function qrCheckInAdmin(
 
     await batch.commit();
 
-    return { success: true, displayName: memberData?.displayName };
+    // ゲーミフィケーション: QRチェックインでポイント付与
+    let gamification: GamificationResult = { ...EMPTY_GAMIFICATION_RESULT };
+    try {
+        gamification = await awardPointsWithResult(memberUid, 'attendance', 10);
+        await updateCircleLeaderboard(circleId, memberUid, gamification.pointsAwarded[0]?.points ?? 10);
+        const streakResult = await recalculateStreak(memberUid);
+        if (streakResult.streakGamification) {
+            gamification = mergeGamificationResults(gamification, streakResult.streakGamification);
+        } else if (streakResult.currentStreak >= 2) {
+            gamification.streakUpdate = { current: streakResult.currentStreak, isMilestone: false };
+        }
+    } catch (e) { /* ポイント付与失敗は無視 */ }
+
+    return { success: true, displayName: memberData?.displayName, gamification };
 }
 
 // =====================
@@ -673,6 +701,9 @@ export async function confirmPaymentAdmin(
         .collection('events').doc(eventId)
         .collection('payments').doc(paymentId);
 
+    const paymentDoc = await paymentRef.get();
+    const payerUid = paymentDoc.data()?.uid;
+
     await paymentRef.update({
         status: 'confirmed',
         confirmedAt: FieldValue.serverTimestamp(),
@@ -680,7 +711,17 @@ export async function confirmPaymentAdmin(
         updatedAt: FieldValue.serverTimestamp(),
     });
 
+    // ゲーミフィケーション: 支払い確認でポイント付与
+    let gamification: GamificationResult = { ...EMPTY_GAMIFICATION_RESULT };
+    if (payerUid && !paymentDoc.data()?.isGuest) {
+        try {
+            gamification = await awardPointsWithResult(payerUid, 'payment', 5);
+            await updateCircleLeaderboard(circleId, payerUid, gamification.pointsAwarded[0]?.points ?? 5);
+        } catch (e) { /* ポイント付与失敗は無視 */ }
+    }
+
     revalidatePath(`/circles/${circleId}/events/${eventId}/payments`);
+    return { gamification };
 }
 
 /** 幹事が支払いを未払いにリセット */
@@ -884,6 +925,34 @@ export async function respondAttendanceAdmin(
                 });
             }
         }
+        // ゲーミフィケーション: 出欠回答（参加）でポイント付与 + 早期回答ボーナス
+        let gamification: GamificationResult = { ...EMPTY_GAMIFICATION_RESULT };
+        try {
+            const attendResult = await awardPointsWithResult(uid, 'attendance', 10);
+            gamification = attendResult;
+            await updateCircleLeaderboard(circleId, uid, attendResult.pointsAwarded[0]?.points ?? 10);
+
+            // 早期回答ボーナス: イベント3日前までに回答したら+5pt
+            const eventData = eventDoc.data();
+            const eventDate = eventData?.date?.toMillis?.();
+            if (eventDate) {
+                const threeDaysBefore = eventDate - 3 * 24 * 60 * 60 * 1000;
+                if (Date.now() <= threeDaysBefore) {
+                    const earlyResult = await awardPointsWithResult(uid, 'earlyResponse', 5);
+                    gamification = mergeGamificationResults(gamification, earlyResult);
+                    await updateCircleLeaderboard(circleId, uid, earlyResult.pointsAwarded[0]?.points ?? 5);
+                }
+            }
+            const streakResult = await recalculateStreak(uid);
+            if (streakResult.streakGamification) {
+                gamification = mergeGamificationResults(gamification, streakResult.streakGamification);
+            } else if (streakResult.currentStreak >= 2) {
+                gamification.streakUpdate = { current: streakResult.currentStreak, isMilestone: false };
+            }
+        } catch (e) { /* ポイント付与失敗は無視 */ }
+
+        revalidatePath(`/circles/${circleId}/events/${eventId}`);
+        return { gamification };
     } else {
         // Mark as not attending
         await attendanceRef.set({
@@ -901,6 +970,7 @@ export async function respondAttendanceAdmin(
     }
 
     revalidatePath(`/circles/${circleId}/events/${eventId}`);
+    return { gamification: null };
 }
 
 export async function getMyAttendanceAdmin(

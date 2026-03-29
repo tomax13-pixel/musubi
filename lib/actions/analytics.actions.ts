@@ -52,61 +52,56 @@ export async function getCircleStatsAdmin(circleId: string, currentUserUid: stri
     let totalattendance = 0;
     const now = new Date();
 
-    const eventIds: string[] = [];
-
-    // We need to fetch attendance for each event to calculate stats
-    // This might be expensive if there are many events. 
-    // For MVP/Small circles, fetching subcollections for each event is okay.
-    // Optimization: Collection Group query for attendance where circleId == circleId
-
-    // Let's use collectionGroup for attendance to get total attendance count efficiently
-    // But we need to filter by circleId. 
-    // The `attendance` subcollection usually doesn't have `circleId` in it automatically unless we added it?
-    // Looking at `recordAttendanceAdmin` in `admin.actions.ts`, we DO save `circleId` in attendance docs!
-    // So we can use a collectionGroup query.
-
-    const attendanceQuerySnap = await adminDb.collectionGroup('attendance')
-        .where('circleId', '==', circleId)
-        .where('attended', '==', true)
-        .get();
-
-    totalattendance = attendanceQuerySnap.size;
-
-    // Calculate monthly stats
+    // イベントごとにサブコレクションを直接クエリ（collectionGroupインデックス不要）
     const monthlyMap = new Map<string, number>();
-    attendanceQuerySnap.forEach(doc => {
-        const data = doc.data();
-        if (data.checkedInAt) {
-            const date = data.checkedInAt.toDate();
-            // Format: 2024-02
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            monthlyMap.set(key, (monthlyMap.get(key) || 0) + 1);
-        }
-    });
+    let totalPayments = 0;
+    let confirmedPayments = 0;
 
-    // Convert to array and sort (last 6 months)
-    const monthlyStats = Array.from(monthlyMap.entries())
-        .map(([key, value]) => ({ name: key, attendance: value }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .slice(-6); // Last 6 months
+    for (const eventDoc of eventsSnap.docs) {
+        const eventData = eventDoc.data();
+        const eventDate = eventData.date?.toDate?.() ?? eventData.startTime?.toDate?.();
 
-    // Calculate upcoming events locally
-    eventsSnap.forEach(doc => {
-        const data = doc.data();
-        const eventDate = data.startTime?.toDate(); // existing field
         if (eventDate && eventDate > now) {
             upcomingEvents++;
         }
-    });
+
+        // 出席データ
+        const attSnap = await adminDb
+            .collection('circles').doc(circleId)
+            .collection('events').doc(eventDoc.id)
+            .collection('attendance')
+            .where('attended', '==', true)
+            .get();
+
+        totalattendance += attSnap.size;
+
+        attSnap.forEach(doc => {
+            const data = doc.data();
+            const checkDate = data.checkedInAt?.toDate?.() ?? eventDate;
+            if (checkDate) {
+                const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+                monthlyMap.set(key, (monthlyMap.get(key) || 0) + 1);
+            }
+        });
+
+        // 支払いデータ
+        const paySnap = await adminDb
+            .collection('circles').doc(circleId)
+            .collection('events').doc(eventDoc.id)
+            .collection('payments')
+            .get();
+
+        totalPayments += paySnap.size;
+        confirmedPayments += paySnap.docs.filter(d => d.data().status === 'confirmed').length;
+    }
+
+    // 月別統計（直近6ヶ月）
+    const monthlyStats = Array.from(monthlyMap.entries())
+        .map(([key, value]) => ({ name: key, attendance: value }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice(-6);
 
     const averageAttendance = totalEvents > 0 ? (totalattendance / totalEvents) : 0;
-
-    // Payment stats
-    const paymentsSnap = await adminDb.collectionGroup('payments')
-        .where('circleId', '==', circleId).get();
-    const totalPayments = paymentsSnap.size;
-    const confirmedPayments = paymentsSnap.docs
-        .filter(d => d.data().status === 'confirmed').length;
 
     return serializeDoc({
         totalEvents,
@@ -125,63 +120,109 @@ export async function getUnpaidMembersAdmin(circleId: string, currentUserUid: st
     const isOrg = await isOrganizerInternal(circleId, currentUserUid);
     if (!isOrg) throw new Error('Unauthorized: Only organizers can view unpaid members.');
 
-    // 1. Get all payments with status 'unpaid' for this circle
-    // usage of collectionGroup is good practice here too if we have circleId
-    // Looking at `recordAttendanceAdmin`, we DO save `circleId` in payment docs!
-
-    const unpaidPaymentsSnap = await adminDb.collectionGroup('payments')
-        .where('circleId', '==', circleId)
-        .where('status', '==', 'unpaid')
-        .get();
-
-    if (unpaidPaymentsSnap.empty) return [];
-
-    // 2. Aggregate by user
+    // イベントごとにpaymentsサブコレクションを直接クエリ
+    const eventsSnap = await adminDb.collection('circles').doc(circleId).collection('events').get();
     const unpaidMap = new Map<string, UnpaidMember>();
 
-    // We need event names. 
-    // Optimization: Fetch all events for this circle once to create a map of eventId -> eventName
-    const eventsSnap = await adminDb.collection('circles').doc(circleId).collection('events').get();
-    const eventNameMap = new Map<string, { name: string, date: string }>();
-    eventsSnap.forEach(doc => {
-        const d = doc.data();
-        eventNameMap.set(doc.id, {
-            name: d.name || 'Unknown Event',
-            date: d.startTime?.toDate().toISOString() || new Date().toISOString()
-        });
-    });
+    for (const eventDoc of eventsSnap.docs) {
+        const eventData = eventDoc.data();
+        const eventName = eventData.name || 'Unknown Event';
+        const eventDate = eventData.date?.toDate?.()?.toISOString() ?? eventData.startTime?.toDate?.()?.toISOString() ?? '';
 
-    for (const doc of unpaidPaymentsSnap.docs) {
-        const data = doc.data();
-        const uid = data.uid || data.guestId; // Handle guests too? existing logic in admin uses uid or guestId
-        if (!uid) continue;
+        const paySnap = await adminDb
+            .collection('circles').doc(circleId)
+            .collection('events').doc(eventDoc.id)
+            .collection('payments')
+            .where('status', '==', 'unpaid')
+            .get();
 
-        // existing logic stores displayName, email, photoURL in payment doc too, which is handy
+        for (const doc of paySnap.docs) {
+            const data = doc.data();
+            const uid = data.uid || data.guestId;
+            if (!uid) continue;
 
-        if (!unpaidMap.has(uid)) {
-            unpaidMap.set(uid, {
-                uid,
-                displayName: data.displayName || 'Unknown',
-                email: data.email || null,
-                photoURL: data.photoURL || null,
-                totalUnpaid: 0,
-                unpaidEvents: []
+            if (!unpaidMap.has(uid)) {
+                unpaidMap.set(uid, {
+                    uid,
+                    displayName: data.displayName || 'Unknown',
+                    email: data.email || null,
+                    photoURL: data.photoURL || null,
+                    totalUnpaid: 0,
+                    unpaidEvents: [],
+                });
+            }
+
+            const member = unpaidMap.get(uid)!;
+            const amount = Number(data.amount) || 0;
+            member.totalUnpaid += amount;
+            member.unpaidEvents.push({
+                eventId: eventDoc.id,
+                eventName,
+                amount,
+                date: eventDate,
             });
         }
+    }
 
-        const member = unpaidMap.get(uid)!;
-        const amount = Number(data.amount) || 0;
-        const eventInfo = eventNameMap.get(data.eventId);
+    return serializeDoc(Array.from(unpaidMap.values()).sort((a, b) => b.totalUnpaid - a.totalUnpaid));
+}
 
-        member.totalUnpaid += amount;
-        member.unpaidEvents.push({
-            eventId: data.eventId,
-            eventName: eventInfo?.name || 'Unknown Event',
-            amount: amount,
-            date: eventInfo?.date || '',
+/**
+ * サークル内メンバーの出席ランキングを取得
+ */
+export interface MemberRanking {
+    uid: string;
+    displayName: string;
+    photoURL: string | null;
+    attendanceCount: number;
+    rank: number;
+}
+
+export async function getMemberRankingAdmin(circleId: string, currentUserUid: string): Promise<MemberRanking[]> {
+    const isOrg = await isOrganizerInternal(circleId, currentUserUid);
+    if (!isOrg) throw new Error('Unauthorized');
+
+    // イベントごとに出席データを集計（collectionGroup不要）
+    const eventsSnap = await adminDb.collection('circles').doc(circleId).collection('events').get();
+    const countMap = new Map<string, number>();
+
+    for (const eventDoc of eventsSnap.docs) {
+        const attSnap = await adminDb
+            .collection('circles').doc(circleId)
+            .collection('events').doc(eventDoc.id)
+            .collection('attendance')
+            .where('attended', '==', true)
+            .get();
+
+        attSnap.forEach(doc => {
+            const uid = doc.data().uid;
+            if (uid) countMap.set(uid, (countMap.get(uid) || 0) + 1);
         });
     }
 
-    // Convert map to array and sort by total unpaid desc
-    return serializeDoc(Array.from(unpaidMap.values()).sort((a, b) => b.totalUnpaid - a.totalUnpaid));
+    // メンバー情報取得
+    const membersSnap = await adminDb.collection('circles').doc(circleId).collection('members').get();
+    const memberMap = new Map<string, { displayName: string; photoURL: string | null }>();
+    for (const doc of membersSnap.docs) {
+        const data = doc.data();
+        memberMap.set(data.uid, {
+            displayName: data.displayName || 'Unknown',
+            photoURL: data.photoURL || null,
+        });
+    }
+
+    // ランキング作成
+    const rankings: MemberRanking[] = Array.from(memberMap.entries()).map(([uid, info]) => ({
+        uid,
+        displayName: info.displayName,
+        photoURL: info.photoURL,
+        attendanceCount: countMap.get(uid) || 0,
+        rank: 0,
+    }));
+
+    // ソート＆ランク付与
+    rankings.sort((a, b) => b.attendanceCount - a.attendanceCount);
+    rankings.forEach((r, i) => { r.rank = i + 1; });
+
+    return serializeDoc(rankings.slice(0, 10)); // Top 10
 }

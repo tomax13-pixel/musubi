@@ -8,7 +8,14 @@ import { CircleIcon } from '@/components/circles/CircleIcon';
 import { useAuthContext } from '@/components/auth/AuthProvider';
 import { getDashboardData } from '@/lib/actions/dashboard.actions';
 import type { CircleDetail } from '@/lib/actions/dashboard.actions';
+import { getUserGamificationStats, recordDailyLogin } from '@/lib/actions/gamification.actions';
 import { ActionList } from '@/components/home/ActionList';
+import { PointCounter } from '@/components/gamification/PointCounter';
+import { StreakDangerBanner } from '@/components/gamification/StreakDangerBanner';
+import { LoginStreakIndicator } from '@/components/gamification/LoginStreakIndicator';
+import { InactivityWarning } from '@/components/gamification/InactivityWarning';
+import type { StreakDanger } from '@/lib/actions/dashboard.actions';
+import type { LoginStreakResult } from '@/lib/actions/gamification.actions';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -17,15 +24,27 @@ export default function DashboardPage() {
   const { user } = useAuthContext();
   const [actions, setActions] = useState<any[]>([]);
   const [circleDetails, setCircleDetails] = useState<CircleDetail[]>([]);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [streakDanger, setStreakDanger] = useState<StreakDanger | null>(null);
+  const [loginStreakResult, setLoginStreakResult] = useState<LoginStreakResult | null>(null);
+  const [lastPointsEarnedAt, setLastPointsEarnedAt] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
-    getDashboardData(user.uid)
-      .then((dashData) => {
+    Promise.all([
+      getDashboardData(user.uid),
+      getUserGamificationStats(user.uid),
+      recordDailyLogin(user.uid),
+    ])
+      .then(([dashData, gamStats, loginResult]) => {
         setActions(dashData.actions);
         setCircleDetails(dashData.circleDetails);
+        setTotalPoints(gamStats.totalPoints + (loginResult.bonusAwarded ?? 0));
+        setStreakDanger(dashData.streakDanger);
+        setLoginStreakResult(loginResult);
+        setLastPointsEarnedAt(gamStats.lastPointsEarnedAt ?? '');
       })
       .catch((err) => {
         console.error('[Dashboard] error:', err);
@@ -35,15 +54,31 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Compact greeting */}
-      <div className="flex items-center justify-between">
-        <p className="text-[13px] text-muted-foreground">
-          {user?.displayName}さん、おかえりなさい 👋
-        </p>
-        <p className="text-[13px] text-muted-foreground">
-          {format(new Date(), 'M月d日(E)', { locale: ja })}
-        </p>
+      {/* Compact greeting + point counter */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <p className="text-[13px] text-muted-foreground">
+            {user?.displayName}さん、おかえりなさい 👋
+          </p>
+          <p className="text-[13px] text-muted-foreground">
+            {format(new Date(), 'M月d日(E)', { locale: ja })}
+          </p>
+        </div>
+        {!loading && <PointCounter totalPoints={totalPoints} />}
+        {!loading && loginStreakResult && loginStreakResult.loginStreak > 0 && (
+          <LoginStreakIndicator
+            loginStreak={loginStreakResult.loginStreak}
+            bonusAwarded={loginStreakResult.bonusAwarded}
+            isNewDay={loginStreakResult.isNewDay}
+          />
+        )}
       </div>
+
+      {/* Streak Danger Banner */}
+      {!loading && streakDanger && <StreakDangerBanner danger={streakDanger} />}
+
+      {/* Inactivity Warning */}
+      {!loading && !streakDanger && <InactivityWarning lastPointsEarnedAt={lastPointsEarnedAt} />}
 
       {/* Action List — only shows when there are actions */}
       {!loading && actions.length > 0 && (

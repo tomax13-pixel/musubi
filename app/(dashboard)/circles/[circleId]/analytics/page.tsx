@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp, Wallet, Trophy } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuthContext } from '@/components/auth/AuthProvider';
-import { getCircleStatsAdmin, getUnpaidMembersAdmin, type CircleStats, type UnpaidMember } from '@/lib/actions/analytics.actions';
+import { getCircleStatsAdmin, getUnpaidMembersAdmin, getMemberRankingAdmin, type CircleStats, type UnpaidMember, type MemberRanking } from '@/lib/actions/analytics.actions';
 import { getCurrentUserRoleAdmin } from '@/lib/actions/admin.actions';
 import {
     LineChart,
@@ -33,6 +34,7 @@ export default function AnalyticsPage() {
 
     const [stats, setStats] = useState<CircleStats | null>(null);
     const [unpaidMembers, setUnpaidMembers] = useState<UnpaidMember[]>([]);
+    const [rankings, setRankings] = useState<MemberRanking[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -49,13 +51,15 @@ export default function AnalyticsPage() {
             }
 
             // 2. Fetch Data
-            const [statsData, unpaidData] = await Promise.all([
+            const [statsData, unpaidData, rankingData] = await Promise.all([
                 getCircleStatsAdmin(circleId, user.uid),
-                getUnpaidMembersAdmin(circleId, user.uid)
+                getUnpaidMembersAdmin(circleId, user.uid),
+                getMemberRankingAdmin(circleId, user.uid),
             ]);
 
             setStats(statsData);
             setUnpaidMembers(unpaidData);
+            setRankings(rankingData);
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'データの読み込みに失敗しました');
@@ -87,8 +91,14 @@ export default function AnalyticsPage() {
         );
     }
 
+    const stagger = (i: number) => ({
+        initial: { opacity: 0, y: 12 } as const,
+        animate: { opacity: 1, y: 0 } as const,
+        transition: { delay: i * 0.06, duration: 0.3, ease: 'easeOut' as const },
+    });
+
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8">
             {/* Header */}
             <div className="flex items-center gap-2 text-muted-foreground">
                 <Link href={`/circles/${circleId}`} className="hover:text-foreground transition-colors">
@@ -103,126 +113,163 @@ export default function AnalyticsPage() {
 
             {/* Summary Cards */}
             {stats && (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                <motion.div {...stagger(0)} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <Users className="h-4 w-4" />
-                            <span className="text-xs font-medium">メンバー数</span>
+                            <Users className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-medium">メンバー数</span>
                         </div>
                         <p className="text-2xl font-bold">{stats.memberCount}</p>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <TrendingUp className="h-4 w-4" />
-                            <span className="text-xs font-medium">平均出席率</span>
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-medium">平均出席率</span>
                         </div>
                         <p className="text-2xl font-bold">{Math.round((stats.averageAttendance / (stats.memberCount || 1)) * 100)}%</p>
-                        <p className="text-[11px] text-muted-foreground md:mt-1">
-                            AVG: {stats.averageAttendance.toFixed(1)}人
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                            平均 {stats.averageAttendance.toFixed(1)}人 / イベント
                         </p>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <TrendingUp className="h-4 w-4" />
-                            <span className="text-xs font-medium">総イベント数</span>
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-medium">総イベント数</span>
                         </div>
                         <p className="text-2xl font-bold">{stats.totalEvents}</p>
-                        <p className="text-[11px] text-muted-foreground md:mt-1">
-                            今後: {stats.upcomingEvents}件
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                            今後 {stats.upcomingEvents}件
                         </p>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <Wallet className="h-4 w-4" />
-                            <span className="text-xs font-medium">集金率</span>
+                            <Wallet className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-medium">集金率</span>
                         </div>
                         <p className="text-2xl font-bold">
                             {stats.totalPayments > 0
                                 ? Math.round((stats.confirmedPayments / stats.totalPayments) * 100)
                                 : 0}%
                         </p>
-                        <p className="text-[11px] text-muted-foreground md:mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
                             {stats.confirmedPayments} / {stats.totalPayments}件
                         </p>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
                         <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                            <AlertCircle className="h-4 w-4" />
-                            <span className="text-xs font-medium">未回収金総額</span>
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            <span className="text-[11px] font-medium">未回収金</span>
                         </div>
                         <p className="text-2xl font-bold">
                             {formatCurrency(unpaidMembers.reduce((sum, m) => sum + m.totalUnpaid, 0))}
                         </p>
-                        <p className="text-[11px] text-muted-foreground md:mt-1">
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
                             {unpaidMembers.length}人
                         </p>
                     </div>
-                </div>
+                </motion.div>
             )}
 
-            {/* Attendance Chart */}
-            {stats?.monthlyStats && stats.monthlyStats.length > 0 && (
-                <div className="space-y-4">
-                    <h2 className="text-base font-medium">📅 月別出席数（直近6ヶ月）</h2>
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
-                        <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={stats.monthlyStats} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
-                                    <XAxis
-                                        dataKey="name"
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <YAxis
-                                        stroke="#888888"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickFormatter={(value) => `${value}人`}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: '#ffffff',
-                                            border: '1px solid #e5e5e5',
-                                            borderRadius: '6px',
-                                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-                                        }}
-                                        itemStyle={{ color: '#333333', fontSize: '12px' }}
-                                        cursor={{ fill: '#f5f5f5' }}
-                                    />
-                                    <Bar
-                                        dataKey="attendance"
-                                        name="出席者数"
-                                        fill="#333333"
-                                        radius={[2, 2, 0, 0]}
-                                        barSize={32}
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
+            {/* Two-column layout: Chart + Rankings */}
+            <div className="grid gap-6 lg:grid-cols-3">
+                {/* Attendance Chart */}
+                {stats?.monthlyStats && stats.monthlyStats.length > 0 && (
+                    <motion.div {...stagger(1)} className="space-y-3 lg:col-span-2">
+                        <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
+                            月別出席数（直近6ヶ月）
+                        </h2>
+                        <div className="rounded-lg border border-neutral-200 bg-white p-5">
+                            <div className="h-[260px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats.monthlyStats} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
+                                        <XAxis
+                                            dataKey="name"
+                                            stroke="#a3a3a3"
+                                            fontSize={11}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="#a3a3a3"
+                                            fontSize={11}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickFormatter={(value) => `${value}`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: '#ffffff',
+                                                border: '1px solid #e5e5e5',
+                                                borderRadius: '8px',
+                                                fontSize: '12px',
+                                            }}
+                                            cursor={{ fill: '#fafafa' }}
+                                        />
+                                        <Bar
+                                            dataKey="attendance"
+                                            name="出席者数"
+                                            fill="#262626"
+                                            radius={[3, 3, 0, 0]}
+                                            barSize={28}
+                                        />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
+                    </motion.div>
+                )}
+
+                {/* Member Rankings */}
+                <motion.div {...stagger(2)} className="space-y-3">
+                    <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
+                        <Trophy className="mr-1 inline-block h-3.5 w-3.5" />
+                        出席ランキング
+                    </h2>
+                    <div className="rounded-lg border border-neutral-200 bg-white">
+                        {rankings.length === 0 ? (
+                            <p className="p-6 text-center text-sm text-muted-foreground">データがありません</p>
+                        ) : (
+                            <div className="divide-y divide-neutral-100">
+                                {rankings.map((member) => {
+                                    const medal = member.rank === 1 ? '🥇' : member.rank === 2 ? '🥈' : member.rank === 3 ? '🥉' : null;
+                                    return (
+                                        <div key={member.uid} className="flex items-center gap-3 px-4 py-2.5">
+                                            <span className="w-6 text-center text-xs font-medium text-neutral-400">
+                                                {medal ?? `${member.rank}`}
+                                            </span>
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 text-[10px] font-medium">
+                                                {member.displayName.charAt(0)}
+                                            </div>
+                                            <span className="min-w-0 flex-1 truncate text-sm">{member.displayName}</span>
+                                            <span className="text-xs font-medium text-neutral-600">{member.attendanceCount}回</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                </div>
-            )}
+                </motion.div>
+            </div>
 
             {/* Unpaid Members Section */}
-            <div className="space-y-4">
-                <h2 className="text-base font-medium">⚠️ 未払い者リスト</h2>
+            <motion.div {...stagger(3)} className="space-y-3">
+                <h2 className="text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
+                    未払いリスト
+                </h2>
                 {unpaidMembers.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-neutral-200 p-8 text-center">
-                        <p className="text-sm text-muted-foreground">未払いのメンバーはいません 🎉</p>
+                        <p className="text-sm text-muted-foreground">未払いのメンバーはいません</p>
                     </div>
                 ) : (
-                    <div className="rounded-lg border border-neutral-200 bg-white shadow-sm overflow-hidden">
+                    <div className="rounded-lg border border-neutral-200 bg-white overflow-hidden">
                         <div className="divide-y divide-neutral-100">
                             {unpaidMembers.map((member) => (
-                                <div key={member.uid} className="bg-white">
+                                <div key={member.uid}>
                                     <div
                                         className="flex items-center justify-between border-l-2 border-l-transparent p-4 cursor-pointer transition-colors hover:bg-neutral-50 hover:border-l-neutral-400"
                                         onClick={() => setExpandedUser(expandedUser === member.uid ? null : member.uid)}
@@ -248,7 +295,6 @@ export default function AnalyticsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Expanded Details */}
                                     {expandedUser === member.uid && (
                                         <div className="bg-neutral-50 px-4 pb-4 pt-1">
                                             <div className="ml-11 space-y-2">
@@ -266,8 +312,7 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
                 )}
-            </div>
-
+            </motion.div>
         </div>
     );
 }
