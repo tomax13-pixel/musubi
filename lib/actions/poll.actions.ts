@@ -5,6 +5,9 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { serializeDoc } from '@/lib/utils/serialize';
 import { getCurrentUserRoleAdmin } from '@/lib/actions/admin.actions';
+import { awardPointsWithResult, updateCircleLeaderboard } from '@/lib/actions/gamification.actions';
+import type { GamificationResult } from '@/lib/types/gamification';
+import { EMPTY_GAMIFICATION_RESULT } from '@/lib/types/gamification';
 import type { CreatePollInput, VoteResponse } from '@/lib/types/models';
 
 /**
@@ -107,10 +110,17 @@ export async function submitPollVoteAdmin(
     updatedAt: now,
   });
 
+  // ゲーミフィケーション: 投票回答でポイント付与
+  let gamification: GamificationResult = { ...EMPTY_GAMIFICATION_RESULT };
+  try {
+    gamification = await awardPointsWithResult(uid, 'poll', 3);
+    await updateCircleLeaderboard(circleId, uid, gamification.pointsAwarded[0]?.points ?? 3);
+  } catch (e) { /* ポイント付与失敗は無視 */ }
+
   revalidatePath(`/circles/${circleId}`);
 
   const saved = await voteRef.get();
-  return serializeDoc({ ...saved.data() });
+  return { ...serializeDoc({ ...saved.data() }), gamification };
 }
 
 /**

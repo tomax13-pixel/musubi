@@ -69,13 +69,14 @@ export async function getUserPaymentHistory(uid: string): Promise<PaymentRecord[
 }
 
 /**
- * 出席回数からランクを計算
+ * ポイントからランクを計算
+ * @param points - ユーザーの総ポイント数
  */
-export function calculateRank(attendanceCount: number): string {
-    if (attendanceCount >= 51) return 'Legend';
-    if (attendanceCount >= 31) return 'Master';
-    if (attendanceCount >= 16) return 'Expert';
-    if (attendanceCount >= 6) return 'Regular';
+export function calculateRank(points: number): string {
+    if (points >= 500) return 'Legend';
+    if (points >= 250) return 'Master';
+    if (points >= 100) return 'Expert';
+    if (points >= 30) return 'Regular';
     return 'Beginner';
 }
 
@@ -142,17 +143,17 @@ export function calculateStreak(attendanceRecords: AttendanceRecord[]): number {
 }
 
 /**
- * 過去1年間のヒートマップデータを生成
+ * 過去1年間のヒートマップデータを生成（出席回数で濃淡表示対応）
  */
-export async function getHeatmapData(uid: string): Promise<Record<string, boolean>> {
+export async function getHeatmapData(uid: string): Promise<Record<string, number>> {
     const attendanceHistory = await getUserAttendanceHistory(uid);
-    const heatmap: Record<string, boolean> = {};
+    const heatmap: Record<string, number> = {};
 
     attendanceHistory.forEach((record) => {
         if (record.checkedInAt) {
             const date = record.checkedInAt.toDate();
-            const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-            heatmap[dateKey as string] = true;
+            const dateKey = date.toISOString().split('T')[0]!; // YYYY-MM-DD
+            heatmap[dateKey] = (heatmap[dateKey] || 0) + 1;
         }
     });
 
