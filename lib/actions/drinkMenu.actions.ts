@@ -44,19 +44,8 @@ export async function addDrinkMenuItemAdmin(
   if (!name || name.length > 50) throw new Error('名前は1〜50文字で入力してください');
   if (!Number.isInteger(input.price) || input.price < 1) throw new Error('金額は1円以上の整数で入力してください');
 
-  // sortOrder: 同カテゴリ内の最後に追加
-  const existing = await adminDb
-    .collection('circles')
-    .doc(circleId)
-    .collection('drinkMenu')
-    .where('category', '==', input.category)
-    .where('isActive', '==', true)
-    .orderBy('sortOrder', 'desc')
-    .limit(1)
-    .get();
-
-  const firstDoc = existing.docs[0];
-  const nextOrder = existing.empty || !firstDoc ? 0 : (firstDoc.data().sortOrder ?? 0) + 1;
+  // sortOrder: タイムスタンプベースで末尾に追加（複合インデックス不要）
+  const nextOrder = Date.now();
 
   const docRef = await adminDb
     .collection('circles')
