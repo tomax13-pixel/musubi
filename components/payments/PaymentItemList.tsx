@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
 import { addPaymentItemAdmin, removePaymentItemAdmin } from '@/lib/actions/admin.actions';
 import { formatAmount } from '@/lib/utils/date';
-import type { PaymentLineItem } from '@/lib/types/models';
+import { DrinkMenuPicker } from '@/components/payments/DrinkMenuPicker';
+import type { PaymentLineItem, DrinkMenuItem } from '@/lib/types/models';
 
 interface PaymentItemListProps {
   circleId: string;
@@ -17,6 +18,7 @@ interface PaymentItemListProps {
   isOrganizer: boolean;
   currentUserUid: string;
   onItemsChanged: () => void;
+  drinkMenu?: DrinkMenuItem[];
 }
 
 export function PaymentItemList({
@@ -29,6 +31,7 @@ export function PaymentItemList({
   isOrganizer,
   currentUserUid,
   onItemsChanged,
+  drinkMenu,
 }: PaymentItemListProps) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -107,13 +110,32 @@ export function PaymentItemList({
       )}
 
       {/* Add form */}
-      {canEdit && (
+      {canEdit && drinkMenu && drinkMenu.length > 0 ? (
+        <div className="pt-1">
+          <DrinkMenuPicker
+            drinkMenu={drinkMenu}
+            disabled={adding}
+            onSelect={async (item) => {
+              setAdding(true);
+              try {
+                await addPaymentItemAdmin(circleId, eventId, paymentId, { name: item.name, price: item.price }, currentUserUid);
+                toast.success(`${item.name} ¥${item.price.toLocaleString()} を追加`);
+                onItemsChanged();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'エラーが発生しました');
+              } finally {
+                setAdding(false);
+              }
+            }}
+          />
+        </div>
+      ) : canEdit ? (
         <div className="flex items-center gap-1.5 pt-1">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="ドリンク名"
+            placeholder="例: ビール"
             maxLength={50}
             className="h-7 flex-1 rounded border border-neutral-200 px-2 text-[12px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-neutral-300"
           />
@@ -134,7 +156,7 @@ export function PaymentItemList({
             追加
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

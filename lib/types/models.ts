@@ -8,6 +8,17 @@ export type CircleRole = 'organizer' | 'member';
 
 export type PaymentStatus = 'unpaid' | 'pending_confirmation' | 'confirmed';
 
+export type DrinkCategory = 'soft_drink' | 'alcohol' | 'food' | 'other';
+
+export const DRINK_CATEGORY_LABELS: Record<DrinkCategory, string> = {
+  soft_drink: 'ソフトドリンク',
+  alcohol: 'アルコール',
+  food: 'フード',
+  other: 'その他',
+};
+
+export const DRINK_CATEGORIES: DrinkCategory[] = ['soft_drink', 'alcohol', 'food', 'other'];
+
 // =====================
 // Firestore Documents
 // =====================
@@ -118,6 +129,18 @@ export interface Guest {
   addedBy: string;
   addedAt: Timestamp;
   isActive: boolean;
+}
+
+/** circles/{circleId}/drinkMenu/{itemId} */
+export interface DrinkMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  category: DrinkCategory;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 /** notificationLogs/{logId} */

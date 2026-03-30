@@ -176,6 +176,9 @@ export default function CircleDetailPage() {
                 <DropdownMenuItem asChild>
                   <Link href={`/circles/${circleId}/analytics`}>📊 アナリティクス</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/circles/${circleId}/menu`}>🍹 ドリンクメニュー</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={openSettings}>
                   <Settings className="mr-2 h-4 w-4" />

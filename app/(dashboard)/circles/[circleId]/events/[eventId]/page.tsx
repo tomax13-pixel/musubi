@@ -179,39 +179,48 @@ export default function EventDetailPage() {
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">{event.name}</h1>
           {isOrganizer && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground">
-                  <MoreHorizontal className="h-5 w-5" strokeWidth={1.5} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={openEditDialog}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  イベントを編集
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/circles/${circleId}/events/${eventId}/attendance`}>
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    出欠を記録
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/circles/${circleId}/events/${eventId}/checkin`}>
-                    <QrCode className="mr-2 h-4 w-4" />
-                    QRチェックイン
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setDeleteOpen(true)}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  イベントを削除
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+              <Link
+                href={`/circles/${circleId}/events/${eventId}/attendance`}
+                className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
+              >
+                <ClipboardList className="h-3.5 w-3.5" strokeWidth={1.5} />
+                出欠
+              </Link>
+              <Link
+                href={`/circles/${circleId}/events/${eventId}/payments`}
+                className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
+              >
+                💰 集金
+              </Link>
+              <Link
+                href={`/circles/${circleId}/events/${eventId}/checkin`}
+                className="flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-neutral-50"
+              >
+                <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-neutral-100 hover:text-foreground">
+                    <MoreHorizontal className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={openEditDialog}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    イベントを編集
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteOpen(true)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    イベントを削除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
         <div className="mt-2 flex flex-wrap gap-4 text-[13px] text-muted-foreground">
@@ -290,6 +299,14 @@ export default function EventDetailPage() {
         >
           💰 集金状況を見る
         </Link>
+        {!isOrganizer && user && payments.some((p) => p.uid === user.uid) && (
+          <Link
+            href={`/circles/${circleId}/events/${eventId}/payments`}
+            className="rounded-md border border-neutral-200 px-4 py-2 text-[13px] font-medium transition-colors hover:bg-neutral-50"
+          >
+            🍹 ドリンクを追加
+          </Link>
+        )}
       </div>
 
       {/* Recent payments preview */}

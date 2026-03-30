@@ -774,6 +774,16 @@ export async function createEventAdmin(
         updatedAt: now,
     });
 
+    // recentFees を更新（直近3件のユニークな料金）
+    if (input.fee > 0) {
+        try {
+            const circleDoc = await adminDb.collection('circles').doc(circleId).get();
+            const existing: number[] = circleDoc.data()?.recentFees ?? [];
+            const updated = [input.fee, ...existing.filter((f: number) => f !== input.fee)].slice(0, 3);
+            await adminDb.collection('circles').doc(circleId).update({ recentFees: updated });
+        } catch { /* non-critical */ }
+    }
+
     // 全メンバーにプッシュ通知を送る（非同期・失敗しても続行）
     try {
         const { notifyEventCreated } = await import('./notification.actions');

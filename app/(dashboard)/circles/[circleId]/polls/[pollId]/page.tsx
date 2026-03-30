@@ -189,18 +189,29 @@ export default function PollDetailPage() {
                             <th className="sticky left-0 z-10 border-b border-neutral-200 bg-white px-3 py-2 text-left font-medium text-muted-foreground">
                                 メンバー
                             </th>
-                            {poll.candidateDates.map((cd: any) => (
-                                <th
-                                    key={cd.id}
-                                    className={`border-b border-neutral-200 px-3 py-2 text-center font-medium ${bestDateId === cd.id ? 'bg-green-50' : ''
-                                        }`}
-                                >
-                                    <div>{format(new Date(cd.date), 'M/d(E)', { locale: ja })}</div>
-                                    {cd.label && (
-                                        <div className="text-[11px] font-normal text-muted-foreground">{cd.label}</div>
-                                    )}
-                                </th>
-                            ))}
+                            {poll.candidateDates.map((cd: any) => {
+                                const counts = summary[cd.id];
+                                return (
+                                    <th
+                                        key={cd.id}
+                                        className={`border-b border-neutral-200 px-3 py-2 text-center font-medium ${bestDateId === cd.id ? 'bg-green-50' : ''
+                                            }`}
+                                    >
+                                        <div>{format(new Date(cd.date), 'M/d(E)', { locale: ja })}</div>
+                                        {cd.label && (
+                                            <div className="text-[11px] font-normal text-muted-foreground">{cd.label}</div>
+                                        )}
+                                        {counts && votes.length > 0 && (
+                                            <div className="mt-0.5 text-[10px] font-normal text-muted-foreground">
+                                                ⭕{counts.ok} 🔺{counts.maybe} ❌{counts.ng}
+                                            </div>
+                                        )}
+                                        {bestDateId === cd.id && votes.length > 0 && (
+                                            <div className="mt-0.5 text-[10px] font-medium text-green-600">おすすめ</div>
+                                        )}
+                                    </th>
+                                );
+                            })}
                         </tr>
                     </thead>
                     <tbody>
@@ -319,9 +330,24 @@ export default function PollDetailPage() {
 
             {/* 締め切り済み表示 */}
             {isClosed && (
-                <div className="flex items-center gap-2 rounded-md bg-neutral-50 px-4 py-3 text-[13px] text-muted-foreground">
-                    <Lock className="h-4 w-4" />
-                    このアンケートは締め切られました
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2 rounded-md bg-neutral-50 px-4 py-3 text-[13px] text-muted-foreground">
+                        <Lock className="h-4 w-4" />
+                        このアンケートは締め切られました
+                    </div>
+                    {isOrganizer && bestDateId && (() => {
+                        const bestDate = poll.candidateDates.find((cd: any) => cd.id === bestDateId);
+                        if (!bestDate) return null;
+                        const dateStr = new Date(bestDate.date).toISOString().slice(0, 16);
+                        return (
+                            <Link
+                                href={`/circles/${circleId}/events/create?date=${encodeURIComponent(dateStr)}`}
+                                className="block w-full rounded-md bg-foreground px-4 py-2 text-center text-[13px] font-medium text-background transition-colors hover:bg-neutral-800"
+                            >
+                                📅 この日程でイベントを作成
+                            </Link>
+                        );
+                    })()}
                 </div>
             )}
 
